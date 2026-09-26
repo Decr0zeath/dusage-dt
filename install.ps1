@@ -22,9 +22,10 @@ param([switch]$Uninstall)
     $runKey = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run'
     $appKey = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\dusage'
 
+    # Any running copy, wherever it was started from: only one runs at a time, and a new one would
+    # just hand over to the old one.
     function Stop-Widget {
         Get-Process dusage -ErrorAction SilentlyContinue |
-            Where-Object { $_.Path -eq $exe } |
             ForEach-Object { $_.Kill(); $_.WaitForExit(5000) | Out-Null }
     }
 
