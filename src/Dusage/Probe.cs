@@ -36,7 +36,11 @@ static partial class Probe
                     Console.WriteLine($"{source.Name} ({Fmt.Title(snapshot.Plan ?? "unknown plan")})");
                     Line("5-hour", snapshot.Session, now);
                     Line("Weekly", snapshot.Weekly, now);
-                    foreach (var extra in snapshot.Extra) Line(extra.Label, extra.Window, now);
+                    foreach (var extra in snapshot.Extra)
+                    {
+                        if (extra.Session is { } s) Line($"{extra.Label} 5-hour", s, now);
+                        if (extra.Weekly is { } w) Line($"{extra.Label} weekly", w, now);
+                    }
                 }
                 catch (UsageException e)
                 {
@@ -64,7 +68,13 @@ static partial class Probe
         if (e.ValueKind == JsonValueKind.Array)
         {
             Console.WriteLine($"{indent}[{e.GetArrayLength()} items]");
-            if (e.GetArrayLength() > 0) Dump(e[0], indent + "  ");
+            var shown = 0;
+            foreach (var item in e.EnumerateArray())
+            {
+                if (shown++ == 8) break;
+                Console.WriteLine($"{indent}  -");
+                Dump(item, indent + "    ");
+            }
             return;
         }
         if (e.ValueKind != JsonValueKind.Object) return;

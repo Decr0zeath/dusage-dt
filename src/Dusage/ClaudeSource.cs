@@ -11,19 +11,27 @@ namespace Dusage;
 sealed class ClaudeSource : IUsageSource
 {
     const string UsageUrl = "https://api.anthropic.com/api/oauth/usage";
-    const string Stale = "Sign-in token expired — it renews the next time you use Claude Code.";
+    const string Stale = "Paused: Claude Code's sign-in has expired. It renews the next time you use Claude Code.";
     static readonly TimeSpan FiveHours = TimeSpan.FromHours(5), Week = TimeSpan.FromDays(7);
 
     string? _rejectedToken;
 
     public string Key => "claude";
     public string Name => "Claude";
+    public string Via => "Claude Code";
+    public string SignInHint => "Sign in to Claude Code to show this: run `claude`, then /login.";
 
     static string CredentialsPath => Path.Combine(
         Environment.GetEnvironmentVariable("CLAUDE_CONFIG_DIR") is { Length: > 0 } dir
             ? dir
             : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".claude"),
         ".credentials.json");
+
+    public bool HasSignIn()
+    {
+        using var credentials = Net.ReadJsonFile(CredentialsPath);
+        return credentials?.RootElement.Obj("claudeAiOauth")?.Str("accessToken") is { Length: > 0 };
+    }
 
     public async Task<UsageSnapshot> FetchAsync(CancellationToken ct, Action<JsonElement>? inspect = null)
     {
@@ -32,8 +40,7 @@ sealed class ClaudeSource : IUsageSource
         using (var credentials = Net.ReadJsonFile(CredentialsPath))
         {
             var oauth = credentials?.RootElement.Obj("claudeAiOauth");
-            token = oauth?.Str("accessToken")
-                ?? throw new UsageException("Not signed in — run `claude` and log in with your Claude account.", UsageException.Recheck);
+            token = oauth?.Str("accessToken") ?? throw new UsageException(SignInHint, UsageException.Recheck);
             plan = oauth?.Str("subscriptionType");
             if (oauth?.Num("expiresAt") is { } expiresMs && DateTimeOffset.FromUnixTimeMilliseconds((long)expiresMs) <= DateTimeOffset.UtcNow)
                 throw new UsageException(Stale, UsageException.Recheck);
@@ -60,19 +67,38 @@ sealed class ClaudeSource : IUsageSource
         {
             var root = doc.RootElement;
             inspect?.Invoke(root);
-            var extra = new List<NamedWindow>();
-            if (Window(root, "seven_day_opus", Week) is { } opus) extra.Add(new("Opus weekly", opus));
-            if (Window(root, "seven_day_sonnet", Week) is { } sonnet) extra.Add(new("Sonnet weekly", sonnet));
-            return new UsageSnapshot(plan, Window(root, "five_hour", FiveHours), Window(root, "seven_day", Week), extra);
+            return new UsageSnapshot(plan, Window(root.Obj("five_hour"), FiveHours), Window(root.Obj("seven_day"), Week), Extras(root));
         }
     }
 
-    static UsageWindow? Window(JsonElement root, string key, TimeSpan length)
+    /// <summary>Per-model caps (e.g. Opus on Max plans). The "limits" list names every limit the account has;
+    /// the older seven_day_* fields are the fallback.</summary>
+    static List<ExtraLimit> Extras(JsonElement root)
     {
-        if (root.Obj(key) is not { } w || w.Num("utilization") is not { } used) return null;
-        DateTimeOffset? resets = DateTimeOffset.TryParse(w.Str("resets_at"), CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var at)
-            ? at
-            : null;
-        return new UsageWindow(used, resets, length);
+        var extras = new List<ExtraLimit>();
+        if (root.TryGetProperty("limits", out var limits) && limits.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var item in limits.EnumerateArray())
+            {
+                if (item.Str("kind") is not { } kind || kind is "session" or "weekly_all") continue;
+                if (item.Num("percent") is not { } percent) continue;
+                var isSession = item.Str("group") == "session";
+                var window = new UsageWindow(percent, Date(item.Str("resets_at")), isSession ? FiveHours : Week);
+                var label = item.Str("scope") is { Length: > 0 and <= 20 } scope ? Fmt.Label(scope) : Fmt.Label(kind);
+                extras.Add(isSession ? new ExtraLimit(kind, label, window, null) : new ExtraLimit(kind, label, null, window));
+            }
+            return extras;
+        }
+
+        foreach (var (key, label) in new[] { ("seven_day_opus", "Opus"), ("seven_day_sonnet", "Sonnet") })
+            if (Window(root.Obj(key), Week) is { } weekly)
+                extras.Add(new ExtraLimit(key, label, null, weekly));
+        return extras;
     }
+
+    static UsageWindow? Window(JsonElement? w, TimeSpan length) =>
+        w?.Num("utilization") is { } used ? new UsageWindow(used, Date(w?.Str("resets_at")), length) : null;
+
+    static DateTimeOffset? Date(string? s) =>
+        DateTimeOffset.TryParse(s, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var at) ? at : null;
 }

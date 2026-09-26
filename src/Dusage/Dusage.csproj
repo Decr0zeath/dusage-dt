@@ -8,18 +8,32 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>Dusage</RootNamespace>
     <AssemblyName>dusage</AssemblyName>
-    <Version>1.0.0</Version>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <!-- Drawn from Logos.App; windows without their own icon (Settings) use it too. -->
+    <ApplicationIcon>Assets\dusage.ico</ApplicationIcon>
 
-    <!-- `dotnet publish` produces one small dusage.exe that runs on the installed .NET Desktop Runtime. -->
+    <Version>1.1.0</Version>
+    <Product>dUsage/dt</Product>
+    <Company>Decr0zeath</Company>
+    <Copyright>Copyright (c) 2026 Decr0zeath</Copyright>
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
+
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
-    <SelfContained>false</SelfContained>
-    <PublishSingleFile>true</PublishSingleFile>
     <DebugType>embedded</DebugType>
 
     <!-- It idles all day: no background GC thread, and give memory back eagerly. -->
     <ConcurrentGarbageCollection>false</ConcurrentGarbageCollection>
     <TieredPGO>false</TieredPGO>
+  </PropertyGroup>
+
+  <!-- `dotnet publish` makes one dusage.exe with .NET inside, so nothing else needs installing.
+       It is deliberately not compressed: a compressed bundle unpacks into memory (~88 MB private vs ~26 MB);
+       releases ship it zipped instead, which is smaller to download anyway.
+       Plain builds stay framework-dependent to keep the edit-run loop fast. -->
+  <PropertyGroup Condition="'$(_IsPublishing)' == 'true'">
+    <SelfContained>true</SelfContained>
+    <PublishSingleFile>true</PublishSingleFile>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
   </PropertyGroup>
 
   <ItemGroup>

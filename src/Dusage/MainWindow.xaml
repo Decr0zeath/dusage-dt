@@ -1,7 +1,7 @@
 <Window x:Class="Dusage.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="dusage"
+        Title="dUsage/dt"
         WindowStyle="None" AllowsTransparency="True" Background="Transparent"
         ResizeMode="NoResize" SizeToContent="WidthAndHeight"
         ShowInTaskbar="False" Topmost="True" WindowStartupLocation="Manual"
@@ -11,7 +11,6 @@
 
     <Border x:Name="Pill" CornerRadius="7" Background="#FA161618" BorderBrush="#2EFFFFFF" BorderThickness="1" Padding="7,2,8,3"
             MouseLeftButtonDown="OnPillMouseDown"
-            ContextMenuOpening="OnMenuOpening"
             ToolTipOpening="OnTipOpening"
             ToolTipService.InitialShowDelay="400" ToolTipService.ShowDuration="60000" ToolTipService.Placement="Top">
         <Border.ToolTip>
@@ -20,15 +19,13 @@
         <Border.ContextMenu>
             <ContextMenu>
                 <MenuItem Header="Refresh now" Click="OnRefreshClick"/>
-                <Separator/>
-                <MenuItem x:Name="TopmostItem" Header="Always on top" IsCheckable="True" Click="OnTopmostClick"/>
-                <MenuItem x:Name="StartupItem" Header="Start with Windows" IsCheckable="True" Click="OnStartupClick"/>
+                <MenuItem Header="Settings…" Click="OnSettingsClick"/>
                 <Separator/>
                 <MenuItem Header="Exit" Click="OnExitClick"/>
             </ContextMenu>
         </Border.ContextMenu>
 
-        <!-- One row per provider: mark, 5-hour bar, %, weekly bar, % (rows are added in code). -->
+        <!-- One row per service (logo, 5-hour bar, %, weekly bar, %), plus a row per extra limit; built in code. -->
         <Grid x:Name="Body">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto"/>

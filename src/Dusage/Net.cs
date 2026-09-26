@@ -15,7 +15,7 @@ static class Net
             PooledConnectionLifetime = TimeSpan.FromMinutes(5),
         })
         { Timeout = TimeSpan.FromSeconds(20) };
-        http.DefaultRequestHeaders.UserAgent.ParseAdd("dusage/" + App.Version);
+        http.DefaultRequestHeaders.UserAgent.ParseAdd("dusage/" + AppInfo.Version);
         http.DefaultRequestHeaders.Accept.ParseAdd("application/json");
         return http;
     }

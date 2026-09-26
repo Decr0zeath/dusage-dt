@@ -6,9 +6,8 @@ namespace Dusage;
 
 public partial class App : Application
 {
-    public const string Version = "1.0.0";
-
     Mutex? _singleInstance;
+    EventWaitHandle? _summon;
 
     protected override void OnStartup(StartupEventArgs e)
     {
@@ -20,9 +19,13 @@ public partial class App : Application
             return;
         }
 
+        // Launching dusage while it already runs (say, from the Start menu) brings the running one back
+        // into view with its settings open, instead of silently doing nothing.
+        _summon = new EventWaitHandle(false, EventResetMode.AutoReset, @"Local\dusage-widget-summon");
         _singleInstance = new Mutex(initiallyOwned: true, @"Local\dusage-widget", out var isFirst);
         if (!isFirst)
         {
+            _summon.Set();
             Shutdown();
             return;
         }
@@ -37,7 +40,17 @@ public partial class App : Application
             args.Handled = true;
         };
 
-        MainWindow = new MainWindow(Settings.Load());
-        MainWindow.Show();
+        var settings = Settings.Load();
+        var widget = new MainWindow(settings);
+        MainWindow = widget;
+        widget.Show();
+        ThreadPool.RegisterWaitForSingleObject(_summon, (_, _) => widget.Dispatcher.InvokeAsync(widget.Summon), null, Timeout.Infinite, executeOnlyOnce: false);
+
+        if (settings.IsNew)
+        {
+            // First run: Settings doubles as the welcome screen.
+            settings.Save();
+            widget.OpenSettings();
+        }
     }
 }

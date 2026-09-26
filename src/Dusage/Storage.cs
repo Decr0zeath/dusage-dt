@@ -53,12 +53,28 @@ public sealed class Settings
     public double? Left { get; set; }
     public double? Top { get; set; }
     public bool Topmost { get; set; } = true;
+    public bool ShowPace { get; set; } = true;
     public double RefreshMinutes { get; set; } = 3;
     public double Opacity { get; set; } = 1;
 
+    /// <summary>Services ("claude") and extra limits ("claude:weekly_opus") switched off in Settings.
+    /// Everything else shows, so services added later appear without any setup.</summary>
+    public List<string> Hidden { get; set; } = [];
+
+    /// <summary>No settings file yet: this is the first run.</summary>
+    [JsonIgnore] public bool IsNew { get; private set; }
+
     [JsonIgnore] public TimeSpan RefreshInterval => TimeSpan.FromMinutes(Math.Clamp(RefreshMinutes, 1, 60));
 
-    public static Settings Load() => AppData.Read<Settings>(FileName) ?? new Settings();
+    public bool IsShown(string key) => !Hidden.Contains(key);
+
+    public void SetShown(string key, bool shown)
+    {
+        Hidden.Remove(key);
+        if (!shown) Hidden.Add(key);
+    }
+
+    public static Settings Load() => AppData.Read<Settings>(FileName) ?? new Settings { IsNew = true };
 
     public void Save() => AppData.Write(FileName, this);
 }

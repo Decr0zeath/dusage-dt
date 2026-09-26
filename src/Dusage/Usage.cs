@@ -1,9 +1,21 @@
 using System.Globalization;
+using System.Reflection;
 using System.Text.Json;
 
 namespace Dusage;
 
-/// <summary>One rate-limit window (the 5-hour session or the weekly cap) as last reported.</summary>
+static class AppInfo
+{
+    public const string Name = "dUsage/dt";
+    public const string Author = "Decr0zeath";
+    public const string AuthorUrl = "https://github.com/Decr0zeath";
+    public const string RepoUrl = "https://github.com/Decr0zeath/dusage-dt";
+
+    public static readonly string Version =
+        typeof(AppInfo).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion.Split('+')[0] ?? "0.0.0";
+}
+
+/// <summary>One rate-limit window (a 5-hour session or a weekly cap) as last reported.</summary>
 public sealed record UsageWindow(double Percent, DateTimeOffset? ResetsAt, TimeSpan Length)
 {
     public bool HasReset(DateTimeOffset now) => ResetsAt is { } at && at <= now;
@@ -16,9 +28,10 @@ public sealed record UsageWindow(double Percent, DateTimeOffset? ResetsAt, TimeS
         ResetsAt is { } at && at > now && Length > TimeSpan.Zero ? Math.Clamp(1 - (at - now) / Length, 0, 1) : null;
 }
 
-public sealed record NamedWindow(string Label, UsageWindow Window);
+/// <summary>A limit on top of the plan's main ones, e.g. a weekly cap for one model.</summary>
+public sealed record ExtraLimit(string Key, string Label, UsageWindow? Session, UsageWindow? Weekly);
 
-public sealed record UsageSnapshot(string? Plan, UsageWindow? Session, UsageWindow? Weekly, IReadOnlyList<NamedWindow> Extra);
+public sealed record UsageSnapshot(string? Plan, UsageWindow? Session, UsageWindow? Weekly, IReadOnlyList<ExtraLimit> Extra);
 
 /// <summary>What the widget knows about one provider. Persisted so a restart shows the last numbers immediately.</summary>
 public sealed class ProviderState
@@ -32,6 +45,14 @@ public interface IUsageSource
 {
     string Key { get; }
     string Name { get; }
+
+    /// <summary>The tool whose sign-in is borrowed, e.g. "Claude Code".</summary>
+    string Via { get; }
+
+    string SignInHint { get; }
+
+    /// <summary>Cheap local check: is there a saved sign-in to use at all?</summary>
+    bool HasSignIn();
 
     /// <param name="inspect">Receives the raw response; only used by <c>--probe-raw</c>.</param>
     Task<UsageSnapshot> FetchAsync(CancellationToken ct, Action<JsonElement>? inspect = null);
@@ -52,6 +73,11 @@ static class Fmt
     public static string Pct(double percent) => ((int)Math.Floor(Math.Clamp(percent, 0, 100))).ToString(CultureInfo.CurrentCulture);
 
     public static string Title(string? s) => string.IsNullOrEmpty(s) ? "" : char.ToUpperInvariant(s[0]) + s[1..];
+
+    /// <summary>"weekly_opus" → "Opus", "code_review" → "Code Review".</summary>
+    public static string Label(string key) =>
+        string.Join(' ', key.Replace("weekly_", "").Replace("session_", "")
+            .Split('_', StringSplitOptions.RemoveEmptyEntries).Select(Title));
 
     public static string Span(TimeSpan t) =>
         t.TotalDays >= 1 ? $"{(int)t.TotalDays}d {t.Hours}h"
