@@ -1,6 +1,7 @@
 using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Interop;
@@ -12,12 +13,15 @@ namespace Dusage;
 /// <summary>
 /// The widget, expanded: every limit with a full-width bar and its reset time, then Settings (what to show and how
 /// the widget behaves) and Info (updates, credits, the fine print) a click away. It takes the widget's place while
-/// open and hands it back when collapsed. Every setting applies and saves immediately.
+/// open and hands it back when collapsed, and keeps one size whichever page or settings section is open.
+/// Every setting applies and saves immediately.
 /// </summary>
 public partial class ExpandedWindow : Window
 {
     readonly MainWindow _widget;
+    readonly (ToggleButton Head, UIElement Body)[] _sections;
     IntPtr _hwnd;
+    bool _opening, _restoreArmed;
 
     Settings Settings => _widget.Settings;
     Updater Updater => _widget.Updater;
@@ -35,6 +39,8 @@ public partial class ExpandedWindow : Window
         LicenseLink.NavigateUri = new Uri(AppInfo.RepoUrl + "/blob/main/LICENSE");
         // The stars stop at the rounded corners, just inside the 1px frame.
         Inside.SizeChanged += (_, _) => Inside.Clip = new RectangleGeometry(new Rect(Inside.RenderSize), 9, 9);
+        _sections = [(ServicesHead, ServicesBody), (WidgetHead, WidgetBody), (NumbersHead, NumbersBody), (ColorsHead, ColorsBody)];
+        Open(ServicesHead);
         ShowUsage();
         BuildServices();
         BuildOptions();
@@ -64,11 +70,13 @@ public partial class ExpandedWindow : Window
         Native.KeepOnScreen(_hwnd, clearOfTaskbar: true);
     }
 
-    /// <summary>Pages differ in height; near the bottom of the screen, grow upward so the bottom edge stays put.</summary>
+    /// <summary>Pages differ in size; near the bottom or right of the screen, grow upward or leftward so that edge stays put.</summary>
     void OnSizeChanged(object sender, SizeChangedEventArgs e)
     {
         if (e.PreviousSize.Height == 0) return; // the first layout; ShowOver placed it
-        if (Native.Corner(_hwnd).Bottom) Top -= e.NewSize.Height - e.PreviousSize.Height;
+        var (right, bottom) = Native.Corner(_hwnd);
+        if (right) Left -= e.NewSize.Width - e.PreviousSize.Width;
+        if (bottom) Top -= e.NewSize.Height - e.PreviousSize.Height;
         Native.KeepOnScreen(_hwnd, clearOfTaskbar: true);
     }
 
@@ -99,7 +107,14 @@ public partial class ExpandedWindow : Window
         var now = DateTimeOffset.Now;
         var shown = _widget.Providers.Where(_widget.Wanted).ToList();
         Usage.Children.Clear();
-        PaceNote.Visibility = shown.Count > 0 && Settings.ShowPace ? Visibility.Visible : Visibility.Collapsed;
+        var left = Settings.Numbers == NumberStyle.Left;
+        PaceNote.Text = (left, Settings.ShowPace) switch
+        {
+            (true, true) => "Numbers show what's left of each limit; the tick, how much of its time is left.",
+            (true, false) => "Numbers show what's left of each limit.",
+            _ => "The tick marks how much of each window's time has passed.",
+        };
+        PaceNote.Visibility = shown.Count > 0 && (left || Settings.ShowPace) ? Visibility.Visible : Visibility.Collapsed;
 
         if (shown.Count == 0)
         {
@@ -178,11 +193,10 @@ public partial class ExpandedWindow : Window
             VerticalAlignment = VerticalAlignment.Center,
             Typography = { NumeralAlignment = FontNumeralAlignment.Tabular },
         };
-        _widget.Fill(bar, percent, window, now, hideIfMissing: false);
-        if (window is not null) percent.Text += "%";
+        _widget.Fill(bar, percent, window, now, ifMissing: Visibility.Visible, percentSign: true);
         var reset = new TextBlock
         {
-            Text = window is null ? "no data yet" : Fmt.Reset(window, now),
+            Text = window is null ? "no data yet" : Fmt.Reset(window, now, Settings.ResetTimes),
             Foreground = Resource("DimBrush"),
             FontSize = 11.5,
             Margin = new Thickness(0, 1, 0, 0),
@@ -234,10 +248,22 @@ public partial class ExpandedWindow : Window
                     indent: 48);
             }
         }
+        FitSettings();
     }
 
+    /// <summary>Every section but Services. Built again after Restore defaults, which can change every value.</summary>
     void BuildOptions()
     {
+        Options.Children.Clear();
+        Reading.Children.Clear();
+        Warnings.Children.Clear();
+
+        AddRow(Options, null, "Layout", "A small box, or one long line", Resource("DimBrush"),
+            Segments("Layout", Enum.GetValues<WidgetLayout>(), v => v.ToString(), Settings.Layout, v => Settings.Layout = v));
+
+        AddRow(Options, null, "Bar labels", "A tiny 5h and 7d before the bars", Resource("DimBrush"),
+            Switch("Bar labels", Settings.BarLabels, on => Settings.BarLabels = on));
+
         AddRow(Options, null, "Always on top", null, null,
             Switch("Always on top", Settings.Topmost, on => Settings.Topmost = on));
 
@@ -257,18 +283,58 @@ public partial class ExpandedWindow : Window
         };
         AddRow(Options, null, "Start with Windows", null, null, startup);
 
-        AddRow(Options, null, "Pace tick", "Marks how much of each window's time has passed", Resource("DimBrush"),
-            Switch("Pace tick", Settings.ShowPace, on => Settings.ShowPace = on));
-
         AddRow(Options, null, "Refresh every", null, null,
-            Segments("Refresh every", [1, 3, 5, 10, 15], v => $"{v:0}m", Settings.RefreshMinutes, v => Settings.RefreshMinutes = v));
+            Segments<double>("Refresh every", [1, 3, 5, 10, 15], v => $"{v:0}m", Settings.RefreshMinutes, v => Settings.RefreshMinutes = v));
 
-        AddRow(Options, null, "Opacity", null, null, Level("Opacity", 40, 100, 5, Settings.Opacity * 100, v => Settings.Opacity = v / 100));
+        AddRow(Options, null, "Opacity", null, null,
+            Level("Opacity", 40, 100, 5, Settings.Opacity * 100, v => Settings.Opacity = v / 100, out _));
 
         var reset = new Button { Content = "Reset", Style = (Style)FindResource("Flat") };
         AutomationProperties.SetName(reset, "Reset position");
         reset.Click += (_, _) => _widget.ResetPosition();
         AddRow(Options, null, "Position", "Drag the widget anywhere, even onto the taskbar", Resource("DimBrush"), reset);
+
+        AddRow(Reading, null, "Show", "How much of each limit is used, or how much is left", Resource("DimBrush"),
+            Segments("Show", Enum.GetValues<NumberStyle>(), v => v.ToString(), Settings.Numbers, v => Settings.Numbers = v));
+
+        AddRow(Reading, null, "Percent sign", "44% rather than 44 on the widget", Resource("DimBrush"),
+            Switch("Percent sign", Settings.PercentSign, on => Settings.PercentSign = on));
+
+        AddRow(Reading, null, "Reset times", "In the tooltip and on the Usage page", Resource("DimBrush"),
+            Segments("Reset times", Enum.GetValues<ResetStyle>(), v => v.ToString(), Settings.ResetTimes, v => Settings.ResetTimes = v));
+
+        AddRow(Reading, null, "Pace tick", "Marks each window's time, counted like the numbers", Resource("DimBrush"),
+            Switch("Pace tick", Settings.ShowPace, on => Settings.ShowPace = on));
+
+        // Red stays above amber: moving one past the other pushes the other along.
+        Slider? amber = null, red = null;
+        var amberLevel = Level("Amber from", 50, 95, 5, Settings.AmberAt, v =>
+        {
+            Settings.AmberAt = v;
+            if (red is not null && red.Value <= v) red.Value = v + 5;
+        }, out amber);
+        var redLevel = Level("Red from", 55, 100, 5, Settings.RedAt, v =>
+        {
+            Settings.RedAt = v;
+            if (amber is not null && amber.Value >= v) amber.Value = v - 5;
+        }, out red);
+        void ShowLevels()
+        {
+            amberLevel.IsEnabled = redLevel.IsEnabled = Settings.WarningColors;
+            amberLevel.Opacity = redLevel.Opacity = Settings.WarningColors ? 1 : 0.4;
+        }
+        ShowLevels();
+
+        AddRow(Warnings, null, "Warning colors", "Bars and numbers turn amber, then red, as a limit gets used up", Resource("DimBrush"),
+            Switch("Warning colors", Settings.WarningColors, on =>
+            {
+                Settings.WarningColors = on;
+                ShowLevels();
+            }));
+        AddRow(Warnings, Dot(Palette.Amber), "Amber from", "When this much of a limit is used", Resource("DimBrush"), amberLevel);
+        AddRow(Warnings, Dot(Palette.Flare), "Red from", "When this much of a limit is used", Resource("DimBrush"), redLevel);
+
+        FitSettings();
     }
 
     /// <summary>Called by the widget whenever the updater's state changes.</summary>
@@ -308,13 +374,84 @@ public partial class ExpandedWindow : Window
 
     void OnPageChecked(object sender, RoutedEventArgs e)
     {
+        // Hidden, not collapsed: every page keeps its room, so the window doesn't change size between them.
         UsagePage.Visibility = Shown(UsageTab);
         SettingsPage.Visibility = Shown(SettingsTab);
         InfoPage.Visibility = Shown(InfoTab);
-        VersionPanel.Visibility = InfoTab.IsChecked == true ? Visibility.Collapsed : Visibility.Visible; // Info says it all
+        VersionPanel.Visibility = InfoTab.IsChecked == true ? Visibility.Hidden : Visibility.Visible; // Info says it all
         if (InfoTab.IsChecked == true) ShowUpdate(); // freshen "checked … ago"
 
-        static Visibility Shown(RadioButton tab) => tab.IsChecked == true ? Visibility.Visible : Visibility.Collapsed;
+        static Visibility Shown(RadioButton tab) => tab.IsChecked == true ? Visibility.Visible : Visibility.Hidden;
+    }
+
+    /// <summary>A section's title was clicked, or toggled from the keyboard or a screen reader.</summary>
+    void OnSectionToggled(object sender, RoutedEventArgs e)
+    {
+        if (_opening) return; // Open closing the other sections
+        var head = (ToggleButton)sender;
+        Open(head.IsChecked == true ? head : null);
+    }
+
+    /// <summary>Opens one settings section and closes the rest; null closes them all.</summary>
+    void Open(ToggleButton? head)
+    {
+        _opening = true;
+        foreach (var (h, body) in _sections)
+        {
+            h.IsChecked = h == head;
+            body.Visibility = h == head ? Visibility.Visible : Visibility.Collapsed;
+        }
+        _opening = false;
+    }
+
+    /// <summary>
+    /// Holds the Settings page at the height it has with its tallest section open, so opening another section
+    /// never resizes the window. Measured again whenever the sections are rebuilt.
+    /// </summary>
+    void FitSettings()
+    {
+        var open = _sections.FirstOrDefault(s => s.Head.IsChecked == true).Head;
+        var width = Width - 46; // the frame and the page margins
+        SettingsPage.MinHeight = 0;
+        double tallest = 0;
+        foreach (var (head, _) in _sections)
+        {
+            Open(head);
+            // Measure skips anything it thinks is unchanged, and opening a section only marks its own panel;
+            // mark the way up to the page too, or the page reports the size it had before.
+            foreach (var (_, body) in _sections)
+                for (DependencyObject? e = body; e is not null && e != SettingsPage; e = VisualTreeHelper.GetParent(e))
+                    (e as UIElement)?.InvalidateMeasure();
+            SettingsPage.InvalidateMeasure();
+            SettingsPage.Measure(new Size(width, double.PositiveInfinity));
+            tallest = Math.Max(tallest, SettingsPage.DesiredSize.Height);
+        }
+        Open(open);
+        SettingsPage.MinHeight = tallest;
+    }
+
+    void OnRestoreClick(object sender, RoutedEventArgs e)
+    {
+        if (!_restoreArmed)
+        {
+            _restoreArmed = true;
+            RestoreButton.Content = "Click again to restore defaults";
+            RestoreButton.Foreground = WarnBrush;
+            return;
+        }
+        OnRestoreLeave(sender, e);
+        _widget.RestoreDefaults();
+        BuildServices();
+        BuildOptions();
+        ShowUpdate();
+        ShowUsage();
+    }
+
+    void OnRestoreLeave(object sender, RoutedEventArgs e)
+    {
+        _restoreArmed = false;
+        RestoreButton.Content = "Restore defaults";
+        RestoreButton.ClearValue(ForegroundProperty);
     }
 
     void OnUpdateClick(object sender, RoutedEventArgs e) => _ = Updater.InstallAsync();
@@ -375,7 +512,7 @@ public partial class ExpandedWindow : Window
         return box;
     }
 
-    StackPanel Segments(string name, double[] values, Func<double, string> label, double current, Action<double> set)
+    StackPanel Segments<T>(string name, T[] values, Func<T, string> label, T current, Action<T> set)
     {
         var panel = new StackPanel { Orientation = Orientation.Horizontal };
         foreach (var value in values)
@@ -384,7 +521,7 @@ public partial class ExpandedWindow : Window
             {
                 Content = label(value),
                 GroupName = name,
-                IsChecked = Math.Abs(value - current) < 0.001,
+                IsChecked = EqualityComparer<T>.Default.Equals(value, current),
                 Style = (Style)FindResource("Segment"),
             };
             AutomationProperties.SetName(option, $"{name} {label(value)}");
@@ -398,8 +535,18 @@ public partial class ExpandedWindow : Window
         return panel;
     }
 
+    /// <summary>A small colored dot, standing in for an icon.</summary>
+    static Border Dot(Color color) => new()
+    {
+        Width = 8,
+        Height = 8,
+        CornerRadius = new CornerRadius(4),
+        Background = Palette.Brush(color),
+        VerticalAlignment = VerticalAlignment.Center,
+    };
+
     /// <summary>A slider in steps, with its value (as a percentage) beside it.</summary>
-    StackPanel Level(string name, double min, double max, double step, double current, Action<double> set)
+    StackPanel Level(string name, double min, double max, double step, double current, Action<double> set, out Slider slider)
     {
         var value = new TextBlock
         {
@@ -409,7 +556,7 @@ public partial class ExpandedWindow : Window
             Foreground = Resource("DimBrush"),
             VerticalAlignment = VerticalAlignment.Center,
         };
-        var slider = new Slider
+        slider = new Slider
         {
             Width = 140,
             Minimum = min,

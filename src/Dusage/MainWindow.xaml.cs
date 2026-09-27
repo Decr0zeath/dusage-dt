@@ -17,7 +17,9 @@ public partial class MainWindow : Window
     static readonly Brush TextBrush = Palette.Brush(Palette.Starlight), DimBrush = Palette.Brush(Palette.Stardust), AccentBrush = Palette.Brush(Palette.Nebula);
     static readonly FontFamily Serif = new("Georgia");
 
-    readonly Settings _settings;
+    static readonly Brush DividerBrush = Palette.Brush(Palette.Starlight, 0x2E);
+
+    Settings _settings;
     readonly Provider[] _providers;
     readonly Updater _updater = new();
     readonly List<Row> _rows = [];
@@ -39,6 +41,10 @@ public partial class MainWindow : Window
         public Meter WeeklyBar { get; } = Bar();
         public TextBlock SessionText { get; } = Percent(new Thickness(0, 0, 9, 0));
         public TextBlock WeeklyText { get; } = Percent(new Thickness(0));
+
+        /// <summary>The "5h" and "7d" before this line's bars, when bar labels are on.</summary>
+        public TextBlock? SessionLabel { get; set; }
+        public TextBlock? WeeklyLabel { get; set; }
     }
 
     internal IReadOnlyList<Provider> Providers => _providers;
@@ -132,6 +138,15 @@ public partial class MainWindow : Window
     {
         _settings.Left = _settings.Top = null;
         _settings.Save();
+        PlaceInCorner();
+    }
+
+    /// <summary>Every setting back to how a new install has it, the position included.
+    /// Start with Windows lives in the registry, not in settings, and stays as it is.</summary>
+    internal void RestoreDefaults()
+    {
+        _settings = new Settings();
+        ApplySettings();
         PlaceInCorner();
     }
 
@@ -295,13 +310,23 @@ public partial class MainWindow : Window
             _expanded?.BuildServices();
         }
 
-        var layout = string.Join('|', wanted.Select(w => w.Extra is null ? w.Provider.Key : w.Provider.ExtraKey(w.Extra)));
+        var line = _settings.Layout == WidgetLayout.Line;
+        var layout = $"{_settings.Layout}:{_settings.BarLabels}:{_settings.PercentSign}:"
+                   + string.Join('|', wanted.Select(w => w.Extra is null ? w.Provider.Key : w.Provider.ExtraKey(w.Extra)));
         if (layout == _layout) return;
         _layout = layout;
 
         Body.Children.Clear();
         Body.RowDefinitions.Clear();
+        Body.ColumnDefinitions.Clear();
         _rows.Clear();
+
+        // Each line takes five columns (seven with the bar labels, each just before its bar). A box stacks the lines
+        // in rows; a line puts them side by side in one row, with a divider column between services (and a plain
+        // gap before a service's extra limit).
+        var span = _settings.BarLabels ? 7 : 5;
+        var columns = line ? Math.Max(1, wanted.Count) * (span + 1) - 1 : span;
+        for (var i = 0; i < columns; i++) Body.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
         if (wanted.Count == 0)
         {
@@ -336,18 +361,47 @@ public partial class MainWindow : Window
             mark.Margin = new Thickness(0, 0, 6, 0);
 
             var row = new Row(p, extra?.Key, mark);
-            var index = Body.RowDefinitions.Count;
-            Body.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-            FrameworkElement[] cells = [mark, row.SessionBar, row.SessionText, row.WeeklyBar, row.WeeklyText];
-            for (var column = 0; column < cells.Length; column++)
+            // Fixed widths, wide enough for "100" or "100%", so the widget doesn't change size as the numbers do.
+            row.SessionText.Width = row.WeeklyText.Width = _settings.PercentSign ? 27 : 19;
+            int index = _rows.Count, first = line ? index * (span + 1) : 0;
+            if (!line || index == 0) Body.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            if (line && index > 0)
             {
-                Grid.SetRow(cells[column], index);
-                Grid.SetColumn(cells[column], column);
-                Body.Children.Add(cells[column]);
+                var divider = new Border
+                {
+                    Width = 1,
+                    Margin = new Thickness(extra is null ? 8 : 4, 3, extra is null ? 8 : 4, 3),
+                    Background = extra is null ? DividerBrush : Brushes.Transparent,
+                };
+                Grid.SetColumn(divider, first - 1);
+                Body.Children.Add(divider);
+            }
+            if (_settings.BarLabels)
+            {
+                row.SessionLabel = BarLabel("5h");
+                row.WeeklyLabel = BarLabel("7d");
+            }
+            FrameworkElement?[] cells = [mark, row.SessionLabel, row.SessionBar, row.SessionText, row.WeeklyLabel, row.WeeklyBar, row.WeeklyText];
+            var column = first;
+            foreach (var cell in cells.OfType<FrameworkElement>())
+            {
+                Grid.SetRow(cell, line ? 0 : index);
+                Grid.SetColumn(cell, column++);
+                Body.Children.Add(cell);
             }
             _rows.Add(row);
         }
     }
+
+    /// <summary>A tiny "5h" or "7d", just before its bar.</summary>
+    static TextBlock BarLabel(string text) => new()
+    {
+        Text = text,
+        Foreground = DimBrush,
+        FontSize = 8,
+        Margin = new Thickness(0, 0, 3, 0),
+        VerticalAlignment = VerticalAlignment.Center,
+    };
 
     static Meter Bar() => new()
     {
@@ -359,7 +413,6 @@ public partial class MainWindow : Window
 
     static TextBlock Percent(Thickness margin) => new()
     {
-        Width = 19,
         Margin = margin,
         TextAlignment = TextAlignment.Right,
         VerticalAlignment = VerticalAlignment.Center,
@@ -382,10 +435,13 @@ public partial class MainWindow : Window
                 var extra = row.Provider.Extras.FirstOrDefault(e => e.Key == row.ExtraKey);
                 (session, weekly) = (extra?.Session, extra?.Weekly);
             }
-            // A model's weekly-only limit leaves its 5-hour slot empty rather than showing a dash.
-            var isExtra = row.ExtraKey is not null;
-            Fill(row.SessionBar, row.SessionText, session, now, hideIfMissing: isExtra);
-            Fill(row.WeeklyBar, row.WeeklyText, weekly, now, hideIfMissing: isExtra);
+            // A model's weekly-only limit leaves its 5-hour slot empty rather than showing a dash; in a line, it closes up.
+            var ifMissing = row.ExtraKey is null ? Visibility.Visible
+                : _settings.Layout == WidgetLayout.Line ? Visibility.Collapsed : Visibility.Hidden;
+            Fill(row.SessionBar, row.SessionText, session, now, ifMissing, _settings.PercentSign);
+            Fill(row.WeeklyBar, row.WeeklyText, weekly, now, ifMissing, _settings.PercentSign);
+            if (row.SessionLabel is { } sessionLabel) sessionLabel.Visibility = row.SessionBar.Visibility;
+            if (row.WeeklyLabel is { } weeklyLabel) weeklyLabel.Visibility = row.WeeklyBar.Visibility;
 
             // Numbers stay readable when they can't update; only the logo fades, and the tooltip says why.
             row.Mark.Opacity = IsFresh(state, now) ? 1 : 0.35;
@@ -407,10 +463,11 @@ public partial class MainWindow : Window
             ? problem + (state.FetchedAt is { } good ? $" Last good update: {Fmt.Ago(now - good)}." : "")
             : state.FetchedAt is { } at ? "Updated " + Fmt.Ago(now - at) : "Loading…";
 
-    /// <summary>Shows a window's use as a bar and a number, amber from 75% and red from 90%.</summary>
-    internal void Fill(Meter bar, TextBlock text, UsageWindow? window, DateTimeOffset now, bool hideIfMissing)
+    /// <summary>Shows a window's use (or what's left) as a bar and a number, amber and then red as it fills up.
+    /// With no data, the bar and number show a dash, or <paramref name="ifMissing"/> hides them.</summary>
+    internal void Fill(Meter bar, TextBlock text, UsageWindow? window, DateTimeOffset now, Visibility ifMissing, bool percentSign)
     {
-        bar.Visibility = text.Visibility = window is null && hideIfMissing ? Visibility.Hidden : Visibility.Visible;
+        bar.Visibility = text.Visibility = window is null ? ifMissing : Visibility.Visible;
         if (window is null)
         {
             bar.Value = bar.Pace = double.NaN;
@@ -418,12 +475,15 @@ public partial class MainWindow : Window
             text.Foreground = DimBrush;
             return;
         }
-        var percent = window.PercentAt(now);
-        var brush = percent >= 90 ? HighBrush : percent >= 75 ? WarnBrush : NormalBrush;
-        bar.Value = percent / 100;
-        bar.Pace = _settings.ShowPace ? window.ElapsedAt(now) ?? double.NaN : double.NaN;
+        var used = window.PercentAt(now);
+        var brush = !_settings.WarningColors ? NormalBrush
+            : used >= _settings.RedAt ? HighBrush
+            : used >= _settings.AmberAt ? WarnBrush
+            : NormalBrush;
+        bar.Value = _settings.Count(used) / 100;
+        bar.Pace = _settings.ShowPace && window.ElapsedAt(now) is { } elapsed ? _settings.Pace(elapsed) : double.NaN;
         bar.Fill = brush;
-        text.Text = Fmt.Pct(percent);
+        text.Text = Fmt.Pct(_settings.Count(used)) + (percentSign ? "%" : "");
         text.Foreground = brush == NormalBrush ? TextBrush : brush;
     }
 
@@ -470,9 +530,11 @@ public partial class MainWindow : Window
                 Margin = new Thickness(0, 3, 0, 0),
             });
         }
+        var left = _settings.Numbers == NumberStyle.Left;
+        var tick = !_settings.ShowPace ? "" : left ? " · tick: time left in the window" : " · tick: time elapsed in the window";
         panel.Children.Add(new TextBlock
         {
-            Text = "Left bar: 5-hour · right bar: weekly · tick: time elapsed in the window\n"
+            Text = "Left bar: 5-hour · right bar: weekly" + (left ? " · numbers: % left" : "") + tick + "\n"
                  + "Drag to move · double-click to refresh · right-click to expand",
             Foreground = DimBrush,
             FontSize = 11,
@@ -489,13 +551,13 @@ public partial class MainWindow : Window
         return panel;
     }
 
-    static void AddTipLine(Grid grid, string label, UsageWindow? window, DateTimeOffset now)
+    void AddTipLine(Grid grid, string label, UsageWindow? window, DateTimeOffset now)
     {
         var row = grid.RowDefinitions.Count;
         grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         Cell(label, 0, DimBrush, TextAlignment.Left);
-        Cell(window is null ? "–" : Fmt.Pct(window.PercentAt(now)) + "%", 1, TextBrush, TextAlignment.Right);
-        Cell(window is null ? "no data" : Fmt.Reset(window, now), 2, DimBrush, TextAlignment.Left);
+        Cell(window is null ? "–" : Fmt.Pct(_settings.Count(window.PercentAt(now))) + "%", 1, TextBrush, TextAlignment.Right);
+        Cell(window is null ? "no data" : Fmt.Reset(window, now, _settings.ResetTimes), 2, DimBrush, TextAlignment.Left);
 
         void Cell(string text, int column, Brush brush, TextAlignment align)
         {

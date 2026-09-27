@@ -9,7 +9,7 @@ static class AppInfo
 {
     public const string Name = "dUsage/dt";
     public const string Author = "Decr0zeath";
-    public const string AuthorUrl = "https://github.com/Decr0zeath";
+    public const string AuthorUrl = "https://decr0zeath.github.io";
     public const string RepoUrl = "https://github.com/Decr0zeath/dusage-dt";
 
     public static readonly string Version =
@@ -91,11 +91,16 @@ static class Fmt
 
     public static string Ago(TimeSpan t) => t.TotalMinutes < 1 ? "just now" : Span(t) + " ago";
 
-    public static string Reset(UsageWindow w, DateTimeOffset now)
+    public static string Reset(UsageWindow w, DateTimeOffset now, ResetStyle style = ResetStyle.Both)
     {
         if (w.ResetsAt is not { } at) return w.Percent > 0 ? "" : "not started";
         if (at <= now) return "reset — refreshing soon";
-        return $"resets {When(at, now)} · in {Span(at - now)}";
+        return style switch
+        {
+            ResetStyle.Time => $"resets {When(at, now)}",
+            ResetStyle.Countdown => $"resets in {Span(at - now)}",
+            _ => $"resets {When(at, now)} · in {Span(at - now)}",
+        };
     }
 
     static string When(DateTimeOffset at, DateTimeOffset now)

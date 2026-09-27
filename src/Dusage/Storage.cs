@@ -13,6 +13,7 @@ static class AppData
     {
         WriteIndented = true,
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        Converters = { new JsonStringEnumConverter(JsonNamingPolicy.CamelCase) }, // "layout": "line", not 1
     };
 
     public static T? Read<T>(string name)
@@ -45,6 +46,16 @@ static class AppData
     }
 }
 
+/// <summary>The widget's shape: services stacked in a small box, or side by side in one line.</summary>
+public enum WidgetLayout { Box, Line }
+
+/// <summary>What the percentages count: how much of a limit is used, or how much is left.</summary>
+public enum NumberStyle { Used, Left }
+
+/// <summary>How reset times read: the time and a countdown, or just one of them.</summary>
+public enum ResetStyle { Both, Time, Countdown }
+
+/// <summary>Every preference, as a new one has them; Restore defaults swaps in a fresh instance.</summary>
 public sealed class Settings
 {
     const string FileName = "settings.json";
@@ -52,11 +63,24 @@ public sealed class Settings
     /// <summary>Widget position; null means the default spot above the clock.</summary>
     public double? Left { get; set; }
     public double? Top { get; set; }
+    public WidgetLayout Layout { get; set; } = WidgetLayout.Box;
+    /// <summary>"5h" and "7d" before the widget's bars.</summary>
+    public bool BarLabels { get; set; } = true;
     public bool Topmost { get; set; } = true;
     public bool ShowPace { get; set; } = true;
     public double RefreshMinutes { get; set; } = 3;
     public double Opacity { get; set; } = 1;
     public bool CheckForUpdates { get; set; } = true;
+
+    public NumberStyle Numbers { get; set; } = NumberStyle.Used;
+    /// <summary>"44%" on the widget rather than a bare "44".</summary>
+    public bool PercentSign { get; set; } = true;
+    public ResetStyle ResetTimes { get; set; } = ResetStyle.Both;
+
+    /// <summary>A limit turns amber, then red, once this much of it is used (percent), whichever way the numbers count.</summary>
+    public bool WarningColors { get; set; } = true;
+    public double AmberAt { get; set; } = 75;
+    public double RedAt { get; set; } = 90;
 
     /// <summary>Services ("claude") and extra limits ("claude:weekly_opus") switched off in Settings.
     /// Everything else shows, so services added later appear without any setup.</summary>
@@ -66,6 +90,12 @@ public sealed class Settings
     [JsonIgnore] public bool IsNew { get; private set; }
 
     [JsonIgnore] public TimeSpan RefreshInterval => TimeSpan.FromMinutes(Math.Clamp(RefreshMinutes, 1, 60));
+
+    /// <summary>A limit's percent used, counted the way the numbers read.</summary>
+    public double Count(double usedPercent) => Numbers == NumberStyle.Left ? 100 - usedPercent : usedPercent;
+
+    /// <summary>The pace tick's place (0..1) for a window whose time is this far gone, counted like the numbers.</summary>
+    public double Pace(double elapsed) => Numbers == NumberStyle.Left ? 1 - elapsed : elapsed;
 
     public bool IsShown(string key) => !Hidden.Contains(key);
 
