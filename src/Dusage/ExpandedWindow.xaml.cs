@@ -22,6 +22,7 @@ public partial class ExpandedWindow : Window
     readonly (ToggleButton Head, UIElement Body)[] _sections;
     IntPtr _hwnd;
     bool _opening, _restoreArmed;
+    (bool Right, bool Bottom) _corner = (true, true);
 
     Settings Settings => _widget.Settings;
     Updater Updater => _widget.Updater;
@@ -56,27 +57,27 @@ public partial class ExpandedWindow : Window
     }
 
     /// <summary>
-    /// Opens where the widget is, lined up with the widget's corner nearest the screen's corner:
+    /// Opens where the widget is, lined up with the corner the widget keeps still:
     /// a widget above the clock grows up and to the left.
     /// </summary>
-    internal void ShowOver(Window widget)
+    internal void ShowOver(MainWindow widget)
     {
-        var (right, bottom) = Native.Corner(new WindowInteropHelper(widget).Handle);
+        _corner = widget.Corner;
         var content = (FrameworkElement)Content;
         content.Measure(new Size(Width, double.PositiveInfinity));
-        Left = right ? widget.Left + widget.ActualWidth - Width : widget.Left;
-        Top = bottom ? widget.Top + widget.ActualHeight - content.DesiredSize.Height : widget.Top;
+        Left = _corner.Right ? widget.Left + widget.ActualWidth - Width : widget.Left;
+        Top = _corner.Bottom ? widget.Top + widget.ActualHeight - content.DesiredSize.Height : widget.Top;
         Show();
         Native.KeepOnScreen(_hwnd, clearOfTaskbar: true);
     }
 
-    /// <summary>Pages differ in size; near the bottom or right of the screen, grow upward or leftward so that edge stays put.</summary>
+    /// <summary>Pages differ in size; grow away from the corner it opened against (or was dragged to), so that corner
+    /// stays put. It's kept rather than worked out from the middle after each change, as with the widget.</summary>
     void OnSizeChanged(object sender, SizeChangedEventArgs e)
     {
         if (e.PreviousSize.Height == 0) return; // the first layout; ShowOver placed it
-        var (right, bottom) = Native.Corner(_hwnd);
-        if (right) Left -= e.NewSize.Width - e.PreviousSize.Width;
-        if (bottom) Top -= e.NewSize.Height - e.PreviousSize.Height;
+        if (_corner.Right) Left -= e.NewSize.Width - e.PreviousSize.Width;
+        if (_corner.Bottom) Top -= e.NewSize.Height - e.PreviousSize.Height;
         Native.KeepOnScreen(_hwnd, clearOfTaskbar: true);
     }
 
@@ -91,6 +92,7 @@ public partial class ExpandedWindow : Window
             return; // the button was already released
         }
         Native.KeepOnScreen(_hwnd, clearOfTaskbar: true);
+        _corner = Native.Corner(_hwnd);
     }
 
     void OnKey(object sender, KeyEventArgs e)
@@ -293,18 +295,21 @@ public partial class ExpandedWindow : Window
 
         var startup = new CheckBox { IsChecked = Autostart.IsEnabled, Style = (Style)FindResource("Switch") };
         AutomationProperties.SetName(startup, "Start with Windows");
-        startup.Click += (_, _) =>
+        startup.Checked += (_, _) => SetStartup(true);
+        startup.Unchecked += (_, _) => SetStartup(false);
+        void SetStartup(bool on)
         {
             try
             {
-                Autostart.Set(startup.IsChecked == true);
+                Autostart.Set(on);
             }
             catch (Exception ex)
             {
                 Log.Error(ex);
             }
-            startup.IsChecked = Autostart.IsEnabled;
-        };
+            // If Windows didn't take it, the switch goes back to how things are (which lands here once more, harmlessly).
+            if (Autostart.IsEnabled != on) startup.IsChecked = Autostart.IsEnabled;
+        }
         AddRow(Options, null, "Start with Windows", null, null, startup);
 
         AddRow(Options, null, "Refresh every", null, null,
@@ -524,16 +529,21 @@ public partial class ExpandedWindow : Window
         card.Children.Add(grid);
     }
 
+    /// <summary>An on/off switch. It acts on Checked and Unchecked rather than Click: a screen reader flips a switch
+    /// through UI Automation, which turns it without clicking it.</summary>
     CheckBox Switch(string name, bool on, Action<bool> set)
     {
         var box = new CheckBox { IsChecked = on, Style = (Style)FindResource("Switch") };
         AutomationProperties.SetName(box, name);
-        box.Click += (_, _) =>
-        {
-            set(box.IsChecked == true);
-            _widget.ApplySettings();
-        };
+        box.Checked += (_, _) => Flip(true);
+        box.Unchecked += (_, _) => Flip(false);
         return box;
+
+        void Flip(bool value)
+        {
+            set(value);
+            _widget.ApplySettings();
+        }
     }
 
     StackPanel Segments<T>(string name, T[] values, Func<T, string> label, T current, Action<T> set)

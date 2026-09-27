@@ -55,6 +55,9 @@ public enum NumberStyle { Used, Left }
 /// <summary>How reset times read: the time and a countdown, or just one of them.</summary>
 public enum ResetStyle { Both, Time, Countdown }
 
+/// <summary>The corner of the widget that stays put as rows come and go.</summary>
+public enum WidgetCorner { TopLeft, TopRight, BottomLeft, BottomRight }
+
 /// <summary>Every preference, as a new one has them; Restore defaults swaps in a fresh instance.</summary>
 public sealed class Settings
 {
@@ -63,6 +66,21 @@ public sealed class Settings
     /// <summary>Widget position; null means the default spot above the clock.</summary>
     public double? Left { get; set; }
     public double? Top { get; set; }
+    /// <summary>
+    /// The widget's far edges, and the corner it keeps still: the one nearest the screen's corner when it was last
+    /// dragged. Started up at a different size (a service signed in or out meanwhile), it lines up that corner, not
+    /// its top-left. Older settings files don't have these; the corner is then worked out from the position.
+    /// </summary>
+    public double? Right { get; set; }
+    public double? Bottom { get; set; }
+    public WidgetCorner? Corner { get; set; }
+
+    /// <summary>Back to the default spot above the clock.</summary>
+    public void ForgetPosition()
+    {
+        Left = Top = Right = Bottom = null;
+        Corner = null;
+    }
     public WidgetLayout Layout { get; set; } = WidgetLayout.Box;
     /// <summary>"5h" and "7d" (or "1d", "mo") before the widget's bars.</summary>
     public bool BarLabels { get; set; } = true;
