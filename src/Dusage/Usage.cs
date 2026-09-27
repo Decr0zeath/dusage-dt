@@ -19,8 +19,10 @@ static class AppInfo
     public static void Open(string url) => Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
 }
 
-/// <summary>One rate-limit window (a 5-hour session or a weekly cap) as last reported.</summary>
-public sealed record UsageWindow(double Percent, DateTimeOffset? ResetsAt, TimeSpan Length)
+/// <summary>One rate-limit window (a 5-hour session, a daily or weekly cap, a monthly allowance) as last reported.</summary>
+/// <param name="Name">What it counts, when a line's two bars run over the same window and their lengths
+/// can't tell them apart: Copilot Free's "Chat" and "Completions", both monthly.</param>
+public sealed record UsageWindow(double Percent, DateTimeOffset? ResetsAt, TimeSpan Length, string? Name = null)
 {
     public bool HasReset(DateTimeOffset now) => ResetsAt is { } at && at <= now;
 
@@ -33,9 +35,30 @@ public sealed record UsageWindow(double Percent, DateTimeOffset? ResetsAt, TimeS
 }
 
 /// <summary>A limit on top of the plan's main ones, e.g. a weekly cap for one model.</summary>
-public sealed record ExtraLimit(string Key, string Label, UsageWindow? Session, UsageWindow? Weekly);
+/// <param name="Short">Stands in for <paramref name="Label"/> on the widget, where a long name would widen every line.</param>
+public sealed record ExtraLimit(string Key, string Label, UsageWindow? Session, UsageWindow? Weekly, string? Short = null);
 
-public sealed record UsageSnapshot(string? Plan, UsageWindow? Session, UsageWindow? Weekly, IReadOnlyList<ExtraLimit> Extra);
+/// <summary>
+/// A service's limits. <see cref="Session"/> is the short window (a day or less) and <see cref="Weekly"/> the long one
+/// (a week, a month), whatever their actual length: they're the widget's left and right bars.
+/// </summary>
+/// <param name="Label">Names the main limits when they only cover some models, e.g. Gemini's "Pro".</param>
+public sealed record UsageSnapshot(string? Plan, UsageWindow? Session, UsageWindow? Weekly, IReadOnlyList<ExtraLimit> Extra, string? Label = null)
+{
+    /// <summary>Every limit there is, main ones first, each named by its window: "5-hour", "Weekly", "Opus weekly",
+    /// "Pro daily", "Chat monthly".</summary>
+    public IEnumerable<(string Name, UsageWindow Window)> Limits()
+    {
+        IEnumerable<(string? Label, UsageWindow? Window)> all =
+        [
+            (Label, Session), (Label, Weekly),
+            .. (Extra ?? []).Where(e => e.Key is not null).SelectMany(e => new[] { (e.Label, e.Session), (e.Label, e.Weekly) }),
+        ];
+        foreach (var (label, window) in all)
+            if (window is not null)
+                yield return ((window.Name ?? label) is { } name ? $"{name} {Fmt.Window(window.Length).ToLowerInvariant()}" : Fmt.Window(window.Length), window);
+    }
+}
 
 /// <summary>What the widget knows about one provider. Persisted so a restart shows the last numbers immediately.</summary>
 public sealed class ProviderState
@@ -60,6 +83,9 @@ public interface IUsageSource
 
     /// <param name="inspect">Receives the raw response; only used by <c>--probe-raw</c>.</param>
     Task<UsageSnapshot> FetchAsync(CancellationToken ct, Action<JsonElement>? inspect = null);
+
+    /// <summary>Every service, in the order the widget lists them.</summary>
+    static IUsageSource[] All() => [new ClaudeSource(), new CodexSource(), new CopilotSource(), new GeminiSource(), new KimiSource()];
 }
 
 /// <summary>An expected failure, worded for the tooltip.</summary>
@@ -82,6 +108,34 @@ static class Fmt
     public static string Label(string key) =>
         string.Join(' ', key.Replace("weekly_", "").Replace("session_", "")
             .Split('_', StringSplitOptions.RemoveEmptyEntries).Select(Title));
+
+    /// <summary>A window by its length: "5-hour", "Daily", "Weekly", "Monthly".</summary>
+    public static string Window(TimeSpan length) => length.TotalDays switch
+    {
+        < 0.9 => $"{Math.Round(length.TotalHours)}-hour",
+        < 1.1 => "Daily",
+        >= 6.5 and < 7.5 => "Weekly",
+        >= 27 and < 32 => "Monthly",
+        var days => $"{Math.Round(days)}-day",
+    };
+
+    /// <summary>The same, tiny, for the widget's bar labels: "5h", "1d", "7d", "mo".</summary>
+    public static string Tag(TimeSpan length) => length.TotalDays switch
+    {
+        < 0.9 => $"{Math.Round(length.TotalHours)}h",
+        >= 27 and < 32 => "mo",
+        var days => $"{Math.Round(days)}d",
+    };
+
+    /// <summary>A bar's label: its window ("5h"), or what it counts when it has a name ("Completions" → "comp").</summary>
+    public static string Tag(UsageWindow w) => w.Name is { Length: > 0 } name ? Short(name).ToLowerInvariant() : Tag(w.Length);
+
+    /// <summary>A name cut to fit the widget: "Completions" → "Comp", "Premium Interactions" → "Prem".</summary>
+    public static string Short(string name)
+    {
+        var word = name.Split(' ')[0];
+        return word.Length > 4 ? word[..4] : word;
+    }
 
     public static string Span(TimeSpan t) =>
         t.TotalDays >= 1 ? $"{(int)t.TotalDays}d {t.Hours}h"

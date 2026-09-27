@@ -64,7 +64,7 @@ public sealed class Settings
     public double? Left { get; set; }
     public double? Top { get; set; }
     public WidgetLayout Layout { get; set; } = WidgetLayout.Box;
-    /// <summary>"5h" and "7d" before the widget's bars.</summary>
+    /// <summary>"5h" and "7d" (or "1d", "mo") before the widget's bars.</summary>
     public bool BarLabels { get; set; } = true;
     public bool Topmost { get; set; } = true;
     public bool ShowPace { get; set; } = true;

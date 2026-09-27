@@ -42,7 +42,7 @@ public partial class MainWindow : Window
         public TextBlock SessionText { get; } = Percent(new Thickness(0, 0, 9, 0));
         public TextBlock WeeklyText { get; } = Percent(new Thickness(0));
 
-        /// <summary>The "5h" and "7d" before this line's bars, when bar labels are on.</summary>
+        /// <summary>The "5h" and "7d" (or "1d", "mo") before this line's bars, when bar labels are on.</summary>
         public TextBlock? SessionLabel { get; set; }
         public TextBlock? WeeklyLabel { get; set; }
     }
@@ -55,7 +55,7 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
         _settings = settings;
-        _providers = [new Provider(new ClaudeSource()), new Provider(new CodexSource())];
+        _providers = IUsageSource.All().Select(s => new Provider(s)).ToArray();
 
         var saved = StateStore.Load();
         foreach (var p in _providers)
@@ -71,6 +71,7 @@ public partial class MainWindow : Window
 
         _timer.Tick += (_, _) => Tick();
         _updater.Changed += OnUpdaterChanged;
+        GitHubSignIn.Changed += OnGitHubSignInChanged;
         SystemEvents.PowerModeChanged += OnPowerModeChanged;
         SizeChanged += OnSizeChanged;
         UpdateRows();
@@ -115,6 +116,7 @@ public partial class MainWindow : Window
         _timer.Stop();
         _closing.Cancel();
         SystemEvents.PowerModeChanged -= OnPowerModeChanged;
+        GitHubSignIn.Changed -= OnGitHubSignInChanged;
         SaveState();
         _expanded?.Close();
         _tray?.Dispose();
@@ -277,6 +279,16 @@ public partial class MainWindow : Window
 
     void SaveState() => StateStore.Save(_providers.ToDictionary(p => p.Key, p => p.State));
 
+    /// <summary>Signed in or out with GitHub in Settings: show (and fetch) or drop Copilot now, not at the next tick.</summary>
+    void OnGitHubSignInChanged()
+    {
+        var copilot = _providers.First(p => p.Source is CopilotSource);
+        copilot.NextFetch = default;
+        copilot.State = new ProviderState(); // the last account's numbers aren't this one's
+        Tick();
+        _expanded?.BuildServices();
+    }
+
     void OnPowerModeChanged(object? sender, PowerModeChangedEventArgs e)
     {
         if (e.Mode != PowerModes.Resume) return;
@@ -350,7 +362,7 @@ public partial class MainWindow : Window
                 ? Logos.View(Logos.For(p.Key), 13)
                 : new TextBlock
                 {
-                    Text = extra.Label,
+                    Text = extra.Short ?? extra.Label,
                     Foreground = DimBrush,
                     FontSize = 10,
                     MaxWidth = 56,
@@ -393,13 +405,15 @@ public partial class MainWindow : Window
         }
     }
 
-    /// <summary>A tiny "5h" or "7d", just before its bar.</summary>
+    /// <summary>A tiny "5h" or "7d", just before its bar; Render renames it after the bar's actual window.</summary>
     static TextBlock BarLabel(string text) => new()
     {
         Text = text,
         Foreground = DimBrush,
         FontSize = 8,
         Margin = new Thickness(0, 0, 3, 0),
+        // Against its bar, however wide a longer label ("chat") makes the column.
+        HorizontalAlignment = HorizontalAlignment.Right,
         VerticalAlignment = VerticalAlignment.Center,
     };
 
@@ -424,29 +438,36 @@ public partial class MainWindow : Window
         var now = DateTimeOffset.Now;
         foreach (var row in _rows)
         {
-            var state = row.Provider.State;
-            UsageWindow? session, weekly;
-            if (row.ExtraKey is null)
-            {
-                (session, weekly) = (state.Last?.Session, state.Last?.Weekly);
-            }
-            else
-            {
-                var extra = row.Provider.Extras.FirstOrDefault(e => e.Key == row.ExtraKey);
-                (session, weekly) = (extra?.Session, extra?.Weekly);
-            }
-            // A model's weekly-only limit leaves its 5-hour slot empty rather than showing a dash; in a line, it closes up.
-            var ifMissing = row.ExtraKey is null ? Visibility.Visible
+            var (session, weekly) = Windows(row);
+            // A limit with only one window (a model's weekly cap, Copilot's monthly allowance) leaves the other slot
+            // empty rather than showing a dash; in a line, it closes up. Dashes are for a service with no numbers yet.
+            var ifMissing = session is null && weekly is null ? Visibility.Visible
                 : _settings.Layout == WidgetLayout.Line ? Visibility.Collapsed : Visibility.Hidden;
             Fill(row.SessionBar, row.SessionText, session, now, ifMissing, _settings.PercentSign);
             Fill(row.WeeklyBar, row.WeeklyText, weekly, now, ifMissing, _settings.PercentSign);
-            if (row.SessionLabel is { } sessionLabel) sessionLabel.Visibility = row.SessionBar.Visibility;
-            if (row.WeeklyLabel is { } weeklyLabel) weeklyLabel.Visibility = row.WeeklyBar.Visibility;
+            Label(row.SessionLabel, row.SessionBar, session);
+            Label(row.WeeklyLabel, row.WeeklyBar, weekly);
 
             // Numbers stay readable when they can't update; only the logo fades, and the tooltip says why.
-            row.Mark.Opacity = IsFresh(state, now) ? 1 : 0.35;
+            row.Mark.Opacity = IsFresh(row.Provider.State, now) ? 1 : 0.35;
         }
         _expanded?.ShowUsage();
+
+        static void Label(TextBlock? label, Meter bar, UsageWindow? window)
+        {
+            if (label is null) return;
+            label.Visibility = bar.Visibility;
+            if (window is not null) label.Text = Fmt.Tag(window);
+        }
+    }
+
+    /// <summary>A line's two windows: the left (short) bar's and the right (long) bar's.</summary>
+    static (UsageWindow? Session, UsageWindow? Weekly) Windows(Row row)
+    {
+        var last = row.Provider.State.Last;
+        if (row.ExtraKey is null) return (last?.Session, last?.Weekly);
+        var extra = row.Provider.Extras.FirstOrDefault(e => e.Key == row.ExtraKey);
+        return (extra?.Session, extra?.Weekly);
     }
 
     /// <summary>Updated lately and without trouble.</summary>
@@ -511,13 +532,8 @@ public partial class MainWindow : Window
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto, SharedSizeGroup = "Label" });
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto, SharedSizeGroup = "Percent" });
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-            AddTipLine(grid, "5-hour", state.Last?.Session, now);
-            AddTipLine(grid, "Weekly", state.Last?.Weekly, now);
-            foreach (var extra in p.Extras)
-            {
-                if (extra.Session is { } s) AddTipLine(grid, $"{extra.Label} 5-hour", s, now);
-                if (extra.Weekly is { } w) AddTipLine(grid, $"{extra.Label} weekly", w, now);
-            }
+            foreach (var (name, window) in state.Last?.Limits() ?? [])
+                AddTipLine(grid, name, window, now);
             panel.Children.Add(grid);
 
             panel.Children.Add(new TextBlock
@@ -534,7 +550,8 @@ public partial class MainWindow : Window
         var tick = !_settings.ShowPace ? "" : left ? " · tick: time left in the window" : " · tick: time elapsed in the window";
         panel.Children.Add(new TextBlock
         {
-            Text = "Left bar: 5-hour · right bar: weekly" + (left ? " · numbers: % left" : "") + tick + "\n"
+            Text = $"Left bar: {Kinds(w => w.Session, "5-hour")} · right bar: {Kinds(w => w.Weekly, "weekly")}"
+                 + (left ? " · numbers: % left" : "") + tick + "\n"
                  + "Drag to move · double-click to refresh · right-click to expand",
             Foreground = DimBrush,
             FontSize = 11,
@@ -549,6 +566,14 @@ public partial class MainWindow : Window
                 Margin = new Thickness(0, 6, 0, 0),
             });
         return panel;
+
+        // What the bars on one side are: "5-hour", or "5-hour or daily" with Gemini's day beside Claude's 5 hours.
+        string Kinds(Func<(UsageWindow? Session, UsageWindow? Weekly), UsageWindow?> side, string fallback)
+        {
+            var kinds = _rows.Select(r => side(Windows(r))).OfType<UsageWindow>()
+                .Select(w => (w.Name ?? Fmt.Window(w.Length)).ToLowerInvariant()).Distinct().ToList();
+            return kinds.Count > 0 ? string.Join(" or ", kinds) : fallback;
+        }
     }
 
     void AddTipLine(Grid grid, string label, UsageWindow? window, DateTimeOffset now)

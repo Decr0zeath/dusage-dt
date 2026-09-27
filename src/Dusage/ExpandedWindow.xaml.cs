@@ -150,13 +150,7 @@ public partial class ExpandedWindow : Window
         heading.Children.Add(name);
         panel.Children.Add(heading);
 
-        var limits = new List<(string Label, UsageWindow? Window)> { ("5-hour", state.Last?.Session), ("Weekly", state.Last?.Weekly) };
-        foreach (var extra in p.Extras)
-        {
-            if (extra.Session is { } session) limits.Add(($"{extra.Label} 5-hour", session));
-            if (extra.Weekly is { } weekly) limits.Add(($"{extra.Label} weekly", weekly));
-        }
-        foreach (var (label, window) in limits)
+        foreach (var (label, window) in state.Last?.Limits() ?? [])
             panel.Children.Add(Limit(label, window, now, first: panel.Children.Count == 1));
 
         panel.Children.Add(new TextBlock
@@ -231,24 +225,54 @@ public partial class ExpandedWindow : Window
             var status = !p.SignedIn ? p.Source.SignInHint
                 : p.State.Last?.Plan is { Length: > 0 } plan ? $"{Fmt.Title(plan)} plan · via {p.Source.Via}"
                 : $"Signed in · via {p.Source.Via}";
-            AddRow(Services, Logos.View(Logos.For(p.Key), 22), p.Source.Name, status,
-                p.SignedIn ? Resource("DimBrush") : WarnBrush,
-                Switch(p.Source.Name, Settings.IsShown(p.Key), on => Settings.SetShown(p.Key, on)));
+            var brush = p.SignedIn ? Resource("DimBrush") : WarnBrush;
+            FrameworkElement control = Switch(p.Source.Name, Settings.IsShown(p.Key), on => Settings.SetShown(p.Key, on));
+            if (p.Source is CopilotSource) (status, brush, control) = GitHubRow(p, status, brush, control);
+            AddRow(Services, Logos.View(Logos.For(p.Key), 22), p.Source.Name, status, brush, control);
 
             foreach (var extra in p.Extras)
             {
-                var windows = (extra.Session, extra.Weekly) switch
-                {
-                    (not null, not null) => "5-hour and weekly limits",
-                    (not null, null) => "5-hour limit",
-                    _ => "weekly limit",
-                };
-                AddRow(Services, null, extra.Label, $"Its own {windows}", Resource("DimBrush"),
+                var windows = new[] { extra.Session, extra.Weekly }.OfType<UsageWindow>().Select(w => Fmt.Window(w.Length).ToLowerInvariant()).ToList();
+                AddRow(Services, null, extra.Label, $"Its own {string.Join(" and ", windows)} limit{(windows.Count > 1 ? "s" : "")}", Resource("DimBrush"),
                     Switch(extra.Label, Settings.IsShown(p.ExtraKey(extra)), on => Settings.SetShown(p.ExtraKey(extra), on)),
                     indent: 48);
             }
         }
         FitSettings();
+    }
+
+    /// <summary>
+    /// GitHub Copilot's row also signs in to GitHub, for Copilot users without the GitHub CLI: a button that fetches a
+    /// code, the code while GitHub waits for it, and Sign out once signed in that way.
+    /// </summary>
+    (string Status, Brush Brush, FrameworkElement Control) GitHubRow(Provider p, string status, Brush brush, FrameworkElement toggle)
+    {
+        if (GitHubSignIn.UserCode is { } code)
+            return ($"Enter {code} on the GitHub page that just opened (it's copied). Waiting for GitHub…", Resource("AccentBrush"),
+                Action("Cancel", "Flat", GitHubSignIn.Cancel));
+        if (GitHubSignIn.Busy)
+            return ("Asking GitHub for a code…", Resource("DimBrush"), Action("Cancel", "Flat", GitHubSignIn.Cancel));
+        if (GitHubSignIn.Token is not null)
+        {
+            var both = new StackPanel { Orientation = Orientation.Horizontal };
+            var signOut = Action("Sign out", "Link", GitHubSignIn.SignOut);
+            signOut.Margin = new Thickness(0, 0, 12, 0);
+            signOut.VerticalAlignment = VerticalAlignment.Center;
+            both.Children.Add(signOut);
+            both.Children.Add(toggle);
+            return (status, brush, both);
+        }
+        if (!p.SignedIn && GitHubSignIn.Available)
+            return (GitHubSignIn.Problem ?? status, WarnBrush, Action("Sign in", "Primary", () => _ = GitHubSignIn.StartAsync()));
+        return (status, brush, toggle);
+
+        Button Action(string text, string style, Action click)
+        {
+            var button = new Button { Content = text, Style = (Style)FindResource(style) };
+            AutomationProperties.SetName(button, text == "Sign in" ? "Sign in with GitHub" : text);
+            button.Click += (_, _) => click();
+            return button;
+        }
     }
 
     /// <summary>Every section but Services. Built again after Restore defaults, which can change every value.</summary>
@@ -261,7 +285,7 @@ public partial class ExpandedWindow : Window
         AddRow(Options, null, "Layout", "A small box, or one long line", Resource("DimBrush"),
             Segments("Layout", Enum.GetValues<WidgetLayout>(), v => v.ToString(), Settings.Layout, v => Settings.Layout = v));
 
-        AddRow(Options, null, "Bar labels", "A tiny 5h and 7d before the bars", Resource("DimBrush"),
+        AddRow(Options, null, "Bar labels", "A tiny 5h, 7d and so on before each bar", Resource("DimBrush"),
             Switch("Bar labels", Settings.BarLabels, on => Settings.BarLabels = on));
 
         AddRow(Options, null, "Always on top", null, null,
