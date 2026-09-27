@@ -30,6 +30,9 @@ public partial class MainWindow : Window
     TrayIcon? _tray;
     IntPtr _hwnd;
     bool _placed, _expandWhenPlaced;
+    /// <summary>The corner that stays still as the widget grows or shrinks; see <see cref="OnSizeChanged"/>.</summary>
+    (bool Right, bool Bottom) _corner = (true, true);
+    bool _gitHubSignedIn = GitHubSignIn.Token is not null;
 
     /// <summary>One line of the widget: a service's main limits, or one of its extra limits.</summary>
     sealed class Row(Provider provider, string? extraKey, FrameworkElement mark)
@@ -48,6 +51,7 @@ public partial class MainWindow : Window
     }
 
     internal IReadOnlyList<Provider> Providers => _providers;
+    internal (bool Right, bool Bottom) Corner => _corner;
     internal Settings Settings => _settings;
     internal Updater Updater => _updater;
 
@@ -104,7 +108,9 @@ public partial class MainWindow : Window
         InvalidateMeasure();
         UpdateLayout();
         if (_settings.Left is null || _settings.Top is null) PlaceInCorner();
+        else PlaceSaved();
         Native.KeepOnScreen(_hwnd);
+        if (_settings.Left is { } left && _settings.Top is { } top && (left != Left || top != Top)) SavePosition();
         _placed = true;
         Tick();
         _timer.Start();
@@ -138,7 +144,7 @@ public partial class MainWindow : Window
 
     internal void ResetPosition()
     {
-        _settings.Left = _settings.Top = null;
+        _settings.ForgetPosition();
         _settings.Save();
         PlaceInCorner();
     }
@@ -190,24 +196,52 @@ public partial class MainWindow : Window
         var area = SystemParameters.WorkArea;
         Left = area.Right - ActualWidth - 10;
         Top = area.Bottom - ActualHeight - 10;
+        _corner = (true, true);
         Native.KeepOnScreen(_hwnd);
     }
 
-    /// <summary>When rows come or go, grow away from the nearest screen edges so a corner widget stays in its corner.</summary>
+    /// <summary>
+    /// Back where it was saved, lining up the corner it keeps still: a widget that starts up wider than it was saved
+    /// (a service signed in meanwhile) grows away from its corner, as it would have while running.
+    /// </summary>
+    void PlaceSaved()
+    {
+        _corner = _settings.Corner is { } corner
+            ? (corner is WidgetCorner.TopRight or WidgetCorner.BottomRight, corner is WidgetCorner.BottomLeft or WidgetCorner.BottomRight)
+            : Native.Corner(_hwnd);
+        if (_corner.Right && _settings.Right is { } right) Left = right - ActualWidth;
+        if (_corner.Bottom && _settings.Bottom is { } bottom) Top = bottom - ActualHeight;
+    }
+
+    /// <summary>
+    /// When rows come or go, grow away from the corner the widget keeps still, so a corner widget stays in its corner.
+    /// That corner is only chosen again when the widget is dragged: worked out afresh after each resize, a wide widget
+    /// near the middle of the screen could flip sides and wander off a little further every time.
+    /// </summary>
     void OnSizeChanged(object sender, SizeChangedEventArgs e)
     {
-        // Size changes while starting up aren't rows coming or going; the saved position already fits.
+        // Size changes while starting up aren't rows coming or going; PlaceSaved lines the widget up once it's sized.
         if (!_placed || e.PreviousSize.Width == 0) return;
-        var (right, bottom) = Native.Corner(_hwnd);
-        if (right) Left -= e.NewSize.Width - e.PreviousSize.Width;
-        if (bottom) Top -= e.NewSize.Height - e.PreviousSize.Height;
+        if (_corner.Right) Left -= e.NewSize.Width - e.PreviousSize.Width;
+        if (_corner.Bottom) Top -= e.NewSize.Height - e.PreviousSize.Height;
         Native.KeepOnScreen(_hwnd);
-        if (_settings.Left is not null)
+        if (_settings.Left is not null) SavePosition();
+    }
+
+    void SavePosition()
+    {
+        _settings.Left = Left;
+        _settings.Top = Top;
+        _settings.Right = Left + ActualWidth;
+        _settings.Bottom = Top + ActualHeight;
+        _settings.Corner = _corner switch
         {
-            _settings.Left = Left;
-            _settings.Top = Top;
-            _settings.Save();
-        }
+            (false, false) => WidgetCorner.TopLeft,
+            (true, false) => WidgetCorner.TopRight,
+            (false, true) => WidgetCorner.BottomLeft,
+            (true, true) => WidgetCorner.BottomRight,
+        };
+        _settings.Save();
     }
 
     // ---- polling -------------------------------------------------------------------------------------------
@@ -279,12 +313,18 @@ public partial class MainWindow : Window
 
     void SaveState() => StateStore.Save(_providers.ToDictionary(p => p.Key, p => p.State));
 
-    /// <summary>Signed in or out with GitHub in Settings: show (and fetch) or drop Copilot now, not at the next tick.</summary>
+    /// <summary>Signed in or out with GitHub in Settings: show (and fetch) or drop Copilot now, not at the next tick.
+    /// Also called as a sign-in starts, shows its code or is cancelled, which change nothing about the account.</summary>
     void OnGitHubSignInChanged()
     {
-        var copilot = _providers.First(p => p.Source is CopilotSource);
-        copilot.NextFetch = default;
-        copilot.State = new ProviderState(); // the last account's numbers aren't this one's
+        var signedIn = GitHubSignIn.Token is not null;
+        if (signedIn != _gitHubSignedIn)
+        {
+            _gitHubSignedIn = signedIn;
+            var copilot = _providers.First(p => p.Source is CopilotSource);
+            copilot.NextFetch = default;
+            copilot.State = new ProviderState(); // another account's numbers, possibly
+        }
         Tick();
         _expanded?.BuildServices();
     }
@@ -618,9 +658,8 @@ public partial class MainWindow : Window
             return; // the button was already released
         }
         Native.KeepOnScreen(_hwnd);
-        _settings.Left = Left;
-        _settings.Top = Top;
-        _settings.Save();
+        _corner = Native.Corner(_hwnd); // dropped somewhere new: keep still the corner nearest the screen's
+        SavePosition();
     }
 
     /// <summary>The widget's right-click menu, opened at the tray icon.</summary>
