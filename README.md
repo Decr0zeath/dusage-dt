@@ -23,7 +23,7 @@ No admin rights, and nothing else to install (.NET is built in). The command:
 - adds a Start menu entry and an entry in Settings › Apps
 - sets it to start with Windows, then starts it
 
-**Updates:** dUsage/dt checks GitHub for a new version once a day. When there is one, the tooltip says so and the right-click menu and Settings show **Update to …**. That runs the same installer in a PowerShell window, which checks the download, swaps the app and starts it again; your settings stay. You can turn the daily check off under Settings › Info, and running the install command again always updates too.
+**Updates:** dUsage/dt checks GitHub for a new version once a day. When there is one, the tooltip says so and the right-click menu and the expanded widget show **Update to …**. That runs the same installer in a PowerShell window, which checks the download, swaps the app and starts it again; your settings stay. You can turn the daily check off under Info in the expanded widget, and running the install command again always updates too.
 
 **Downloading by hand instead?** Get `dusage.zip` from [Releases](https://github.com/Decr0zeath/dusage-dt/releases/latest), unzip it, and run `dusage.exe`. The app isn't code-signed, so Windows SmartScreen may say "Windows protected your PC"; choose **More info › Run anyway**. The install command doesn't hit that prompt. A copy set up by hand still tells you about new versions, but its button opens the download page instead of updating.
 
@@ -45,17 +45,25 @@ Hover for details: reset times, plan, and when it last updated.
 
 ![The hover tooltip with reset times for each window](docs/tooltip.png)
 
-**Drag** to move it anywhere, even onto the taskbar. **Double-click** to refresh. **Right-click** for *Refresh now*, *Settings…* and *Exit* (and *Update to …* when there is a new version).
+**Drag** to move it anywhere, even onto the taskbar. **Double-click** to refresh. **Right-click** for *Refresh now*, *Expand* and *Exit* (and *Update to …* when there is a new version). dUsage/dt's hourglass icon in the notification area has the same menu, and clicking it expands the widget.
 
-## Settings
+## Expanded widget
 
-Right-click the widget and choose **Settings…**, or launch dUsage/dt from the Start menu while it's running. That also brings back a widget you've lost track of. Changes apply immediately.
+Right-click the widget and choose **Expand**, click the tray icon, or launch dUsage/dt from the Start menu while it's running. The widget grows into a bigger panel in its place; the button in the top-right corner (or Esc) shrinks it back. That also brings back a widget you've lost track of.
 
-![The settings window: services with on/off switches, and widget options](docs/settings.png)
+![The expanded widget: services with on/off switches, and widget options](docs/settings.png)
 
-- **Services:** switch Claude or ChatGPT on or off. If your plan has separate limits for particular models (for example, an Opus weekly cap on Claude Max), they appear under the service with their own switch, and turning one on adds a row for it.
-- **Widget:** always on top, start with Windows, the pace tick, how often to refresh (1–15 minutes), opacity (a slider from 100% down to 40%), and a button to reset the position.
-- **Info** (bottom left): updates (check now, or switch off the daily check), credits, license, and the fine print.
+Pick a page at the bottom left:
+
+- **Usage:** every limit with a full-width bar, the percent used and when it resets, plus each service's plan and when it last updated.
+- **Settings:** changes apply immediately.
+  - **Services:** switch Claude or ChatGPT on or off. If your plan has separate limits for particular models (for example, an Opus weekly cap on Claude Max), they appear under the service with their own switch, and turning one on adds a row for it.
+  - **Widget:** always on top, start with Windows, the pace tick, how often to refresh (1–15 minutes), opacity (a slider from 100% down to 40%), and a button to reset the position.
+- **Info:** updates (check now, or switch off the daily check), credits, license, and the fine print.
+
+To quit, right-click the tray icon (or the widget) and choose **Exit**.
+
+Windows puts new tray icons in the **^** overflow. To keep the hourglass in view, drag it from there onto the taskbar.
 
 ## How it works
 
@@ -98,8 +106,9 @@ The app is a small WPF project in `src/Dusage`:
 
 - `ClaudeSource.cs` and `CodexSource.cs` fetch usage. To add a service, implement `IUsageSource` and give it a logo in `Logos.cs`.
 - `MainWindow` is the widget.
-- `SettingsWindow` is the settings window.
-- `Updater.cs` checks for and installs new releases; `Palette.cs` holds every color; `Sky.cs` draws the starry backdrop behind Settings.
+- `ExpandedWindow` is the expanded widget: every limit in full, plus Settings and Info.
+- `TrayIcon.cs` is the icon in the notification area.
+- `Updater.cs` checks for and installs new releases; `Palette.cs` holds every color; `Sky.cs` draws the starry backdrop behind the expanded widget.
 
 ## License
 

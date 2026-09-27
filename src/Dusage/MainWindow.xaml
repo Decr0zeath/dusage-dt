@@ -25,11 +25,12 @@
             </ToolTip>
         </Border.ToolTip>
         <Border.ContextMenu>
-            <ContextMenu>
+            <!-- Also the tray icon's menu. -->
+            <ContextMenu Opened="OnMenuOpened">
                 <MenuItem x:Name="UpdateItem" Visibility="Collapsed" Foreground="{StaticResource AccentBrush}" Click="OnUpdateClick"/>
                 <Separator x:Name="UpdateSeparator" Visibility="Collapsed"/>
                 <MenuItem Header="Refresh now" Click="OnRefreshClick"/>
-                <MenuItem Header="Settings…" Click="OnSettingsClick"/>
+                <MenuItem x:Name="ExpandItem" Header="Expand" Click="OnExpandClick"/>
                 <Separator/>
                 <MenuItem Header="Exit" Click="OnExitClick"/>
             </ContextMenu>

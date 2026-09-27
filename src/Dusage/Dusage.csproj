@@ -9,7 +9,7 @@
     <RootNamespace>Dusage</RootNamespace>
     <AssemblyName>dusage</AssemblyName>
     <ApplicationManifest>app.manifest</ApplicationManifest>
-    <!-- Drawn from Logos.App; windows without their own icon (Settings) use it too. -->
+    <!-- Drawn from Logos.App. -->
     <ApplicationIcon>Assets\dusage.ico</ApplicationIcon>
 
     <Version>1.2.0</Version>
@@ -37,7 +37,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <!-- Also the Settings window's title bar and taskbar icon, every size in one file. -->
+    <!-- Also the tray icon and the expanded widget's Alt+Tab icon, every size in one file. -->
     <Resource Include="Assets\dusage.ico" />
   </ItemGroup>
 

@@ -1,5 +1,6 @@
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Interop;
@@ -23,9 +24,10 @@ public partial class MainWindow : Window
     readonly DispatcherTimer _timer = new() { Interval = TimeSpan.FromSeconds(15) };
     readonly CancellationTokenSource _closing = new();
     string? _layout, _services;
-    SettingsWindow? _settingsWindow;
+    ExpandedWindow? _expanded;
+    TrayIcon? _tray;
     IntPtr _hwnd;
-    bool _placed;
+    bool _placed, _expandWhenPlaced;
 
     /// <summary>One line of the widget: a service's main limits, or one of its extra limits.</summary>
     sealed class Row(Provider provider, string? extraKey, FrameworkElement mark)
@@ -73,6 +75,7 @@ public partial class MainWindow : Window
     {
         Topmost = _settings.Topmost;
         Opacity = Math.Clamp(_settings.Opacity, 0.4, 1);
+        if (_expanded is not null) _expanded.Topmost = _settings.Topmost;
     }
 
     protected override void OnSourceInitialized(EventArgs e)
@@ -81,6 +84,10 @@ public partial class MainWindow : Window
         _hwnd = new WindowInteropHelper(this).Handle;
         Native.MakeToolWindow(_hwnd);
         HwndSource.FromHwnd(_hwnd).AddHook(Native.AllowAnySize);
+
+        _tray = new TrayIcon(AppInfo.Name);
+        _tray.Click += Expand;
+        _tray.MenuRequested += ShowTrayMenu;
     }
 
     protected override void OnContentRendered(EventArgs e)
@@ -94,6 +101,7 @@ public partial class MainWindow : Window
         _placed = true;
         Tick();
         _timer.Start();
+        if (_expandWhenPlaced) Expand();
     }
 
     protected override void OnClosed(EventArgs e)
@@ -102,11 +110,12 @@ public partial class MainWindow : Window
         _closing.Cancel();
         SystemEvents.PowerModeChanged -= OnPowerModeChanged;
         SaveState();
-        _settingsWindow?.Close();
+        _expanded?.Close();
+        _tray?.Dispose();
         base.OnClosed(e);
     }
 
-    // ---- called from Settings and from a second launch -----------------------------------------------------
+    // ---- called from the expanded view and from a second launch --------------------------------------------
 
     internal void ApplySettings()
     {
@@ -126,35 +135,34 @@ public partial class MainWindow : Window
         PlaceInCorner();
     }
 
-    public void OpenSettings()
+    /// <summary>Swaps the widget for the expanded view, opened over it. Collapsing it brings the widget back.
+    /// Also what launching dusage again does, which recovers a widget you've lost track of.</summary>
+    public void Expand()
     {
-        if (_settingsWindow is { } open)
+        if (_expanded is { } open)
         {
-            if (open.WindowState == WindowState.Minimized) open.WindowState = WindowState.Normal;
             open.Activate();
             return;
         }
-        _settingsWindow = new SettingsWindow(this);
-        _settingsWindow.Closed += (_, _) => _settingsWindow = null;
-        _settingsWindow.Show();
-        _settingsWindow.Activate();
+        if (!_placed)
+        {
+            _expandWhenPlaced = true; // it opens over the widget, so the widget has to be in place first
+            return;
+        }
+        _expanded = new ExpandedWindow(this);
+        _expanded.Closed += OnCollapsed;
+        _expanded.ShowOver(this);
+        _expanded.Activate();
+        Hide();
     }
 
-    /// <summary>Someone launched dusage again: bring the widget back into view and open Settings.</summary>
-    public void Summon()
+    void OnCollapsed(object? sender, EventArgs e)
     {
+        _expanded = null;
+        if (_closing.IsCancellationRequested) return; // exiting, not collapsing
         Show();
         Native.KeepOnScreen(_hwnd);
-        if (Topmost)
-        {
-            Native.BringToTop(_hwnd);
-        }
-        else
-        {
-            Topmost = true; // raise it once without pinning it
-            Topmost = false;
-        }
-        OpenSettings();
+        if (Topmost) Native.BringToTop(_hwnd);
     }
 
     // ---- placement -----------------------------------------------------------------------------------------
@@ -187,11 +195,11 @@ public partial class MainWindow : Window
 
     // ---- polling -------------------------------------------------------------------------------------------
 
-    bool Wanted(Provider p) => p.SignedIn && _settings.IsShown(p.Key);
+    internal bool Wanted(Provider p) => p.SignedIn && _settings.IsShown(p.Key);
 
     void Tick()
     {
-        if (Topmost && !Pill.ContextMenu.IsOpen && !Tip.IsOpen) Native.BringToTop(_hwnd);
+        if (Topmost && IsVisible && !Pill.ContextMenu.IsOpen && !Tip.IsOpen) Native.BringToTop(_hwnd);
 
         foreach (var p in _providers) p.SignedIn = p.Source.HasSignIn();
         UpdateRows();
@@ -284,7 +292,7 @@ public partial class MainWindow : Window
         if (services != _services)
         {
             _services = services;
-            _settingsWindow?.BuildServices();
+            _expanded?.BuildServices();
         }
 
         var layout = string.Join('|', wanted.Select(w => w.Extra is null ? w.Provider.Key : w.Provider.ExtraKey(w.Extra)));
@@ -361,9 +369,6 @@ public partial class MainWindow : Window
     void Render()
     {
         var now = DateTimeOffset.Now;
-        var staleAfter = 3 * _settings.RefreshInterval;
-        if (staleAfter < TimeSpan.FromMinutes(20)) staleAfter = TimeSpan.FromMinutes(20);
-
         foreach (var row in _rows)
         {
             var state = row.Provider.State;
@@ -383,12 +388,27 @@ public partial class MainWindow : Window
             Fill(row.WeeklyBar, row.WeeklyText, weekly, now, hideIfMissing: isExtra);
 
             // Numbers stay readable when they can't update; only the logo fades, and the tooltip says why.
-            var fresh = state.Problem is null && state.FetchedAt is { } at && now - at < staleAfter;
-            row.Mark.Opacity = fresh ? 1 : 0.35;
+            row.Mark.Opacity = IsFresh(state, now) ? 1 : 0.35;
         }
+        _expanded?.ShowUsage();
     }
 
-    void Fill(Meter bar, TextBlock text, UsageWindow? window, DateTimeOffset now, bool hideIfMissing)
+    /// <summary>Updated lately and without trouble.</summary>
+    internal bool IsFresh(ProviderState state, DateTimeOffset now)
+    {
+        var staleAfter = 3 * _settings.RefreshInterval;
+        if (staleAfter < TimeSpan.FromMinutes(20)) staleAfter = TimeSpan.FromMinutes(20);
+        return state.Problem is null && state.FetchedAt is { } at && now - at < staleAfter;
+    }
+
+    /// <summary>When a service last updated, or why it can't.</summary>
+    internal static string Status(ProviderState state, DateTimeOffset now) =>
+        state.Problem is { } problem
+            ? problem + (state.FetchedAt is { } good ? $" Last good update: {Fmt.Ago(now - good)}." : "")
+            : state.FetchedAt is { } at ? "Updated " + Fmt.Ago(now - at) : "Loading…";
+
+    /// <summary>Shows a window's use as a bar and a number, amber from 75% and red from 90%.</summary>
+    internal void Fill(Meter bar, TextBlock text, UsageWindow? window, DateTimeOffset now, bool hideIfMissing)
     {
         bar.Visibility = text.Visibility = window is null && hideIfMissing ? Visibility.Hidden : Visibility.Visible;
         if (window is null)
@@ -417,7 +437,7 @@ public partial class MainWindow : Window
 
         var shown = _providers.Where(Wanted).ToList();
         if (shown.Count == 0)
-            panel.Children.Add(new TextBlock { Text = "Nothing to show yet. Right-click › Settings to pick services.", Foreground = DimBrush });
+            panel.Children.Add(new TextBlock { Text = "Nothing to show yet. Double-click to pick services.", Foreground = DimBrush });
 
         foreach (var p in shown)
         {
@@ -440,12 +460,9 @@ public partial class MainWindow : Window
             }
             panel.Children.Add(grid);
 
-            var status = state.Problem is { } problem
-                ? problem + (state.FetchedAt is { } good ? $" Last good update: {Fmt.Ago(now - good)}." : "")
-                : state.FetchedAt is { } at ? "Updated " + Fmt.Ago(now - at) : "Loading…";
             panel.Children.Add(new TextBlock
             {
-                Text = status,
+                Text = Status(state, now),
                 Foreground = state.Problem is null ? DimBrush : WarnBrush,
                 TextWrapping = TextWrapping.Wrap,
                 MaxWidth = 320,
@@ -456,7 +473,7 @@ public partial class MainWindow : Window
         panel.Children.Add(new TextBlock
         {
             Text = "Left bar: 5-hour · right bar: weekly · tick: time elapsed in the window\n"
-                 + "Drag to move · double-click to refresh · right-click for settings",
+                 + "Drag to move · double-click to refresh · right-click to expand",
             Foreground = DimBrush,
             FontSize = 11,
             Margin = new Thickness(0, 12, 0, 0),
@@ -501,7 +518,7 @@ public partial class MainWindow : Window
     {
         if (e.ClickCount == 2)
         {
-            if (_rows.Count == 0) OpenSettings();
+            if (_rows.Count == 0) Expand();
             else RefreshNow();
             return;
         }
@@ -519,9 +536,25 @@ public partial class MainWindow : Window
         _settings.Save();
     }
 
+    /// <summary>The widget's right-click menu, opened at the tray icon.</summary>
+    void ShowTrayMenu()
+    {
+        var menu = Pill.ContextMenu;
+        menu.Placement = PlacementMode.MousePoint;
+        menu.IsOpen = true;
+        // Without the foreground, a menu opened from the tray stays open when you click elsewhere.
+        if (PresentationSource.FromVisual(menu) is HwndSource source) Native.Foreground(source.Handle);
+    }
+
+    void OnMenuOpened(object sender, RoutedEventArgs e) => ExpandItem.Header = _expanded is null ? "Expand" : "Collapse";
+
     void OnRefreshClick(object sender, RoutedEventArgs e) => RefreshNow();
 
-    void OnSettingsClick(object sender, RoutedEventArgs e) => OpenSettings();
+    void OnExpandClick(object sender, RoutedEventArgs e)
+    {
+        if (_expanded is { } open) open.Close();
+        else Expand();
+    }
 
     void OnExitClick(object sender, RoutedEventArgs e) => Close();
 
@@ -533,10 +566,10 @@ public partial class MainWindow : Window
         UpdateItem.Visibility = UpdateSeparator.Visibility = shown ? Visibility.Visible : Visibility.Collapsed;
         UpdateItem.Header = UpdateLabel(_updater);
         UpdateItem.IsEnabled = !_updater.Installing;
-        _settingsWindow?.ShowUpdate();
+        _expanded?.ShowUpdate();
     }
 
-    /// <summary>What the update button says, in the menu and in Settings.</summary>
+    /// <summary>What the update button says, in the menu and in the expanded view.</summary>
     internal static string UpdateLabel(Updater updater) =>
         updater.Installing ? "Updating…"
         : updater.Available is not { } release ? ""

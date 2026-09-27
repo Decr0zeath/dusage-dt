@@ -19,8 +19,8 @@ public partial class App : Application
             return;
         }
 
-        // Launching dusage while it already runs (say, from the Start menu) brings the running one back
-        // into view with its settings open, instead of silently doing nothing.
+        // Launching dusage while it already runs (say, from the Start menu) opens the running one's expanded
+        // view, instead of silently doing nothing.
         _summon = new EventWaitHandle(false, EventResetMode.AutoReset, @"Local\dusage-widget-summon");
         _singleInstance = new Mutex(initiallyOwned: true, @"Local\dusage-widget", out var isFirst);
         if (!isFirst)
@@ -44,13 +44,13 @@ public partial class App : Application
         var widget = new MainWindow(settings);
         MainWindow = widget;
         widget.Show();
-        ThreadPool.RegisterWaitForSingleObject(_summon, (_, _) => widget.Dispatcher.InvokeAsync(widget.Summon), null, Timeout.Infinite, executeOnlyOnce: false);
+        ThreadPool.RegisterWaitForSingleObject(_summon, (_, _) => widget.Dispatcher.InvokeAsync(widget.Expand), null, Timeout.Infinite, executeOnlyOnce: false);
 
         if (settings.IsNew)
         {
-            // First run: Settings doubles as the welcome screen.
+            // First run: the expanded view doubles as the welcome screen.
             settings.Save();
-            widget.OpenSettings();
+            widget.Expand();
         }
     }
 }

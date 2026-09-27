@@ -4,7 +4,7 @@ using System.Windows.Media;
 namespace Dusage;
 
 /// <summary>
-/// The backdrop of the Settings window: two faint nebulae and a scatter of stars, a few of them bright and four-pointed.
+/// The backdrop of the expanded widget: two faint nebulae and a scatter of stars, a few of them bright and four-pointed.
 /// The stars are laid out once over a fixed area, so they stay put when the window changes height.
 /// It is its own element so the sky can be animated without touching the content in front of it.
 /// </summary>

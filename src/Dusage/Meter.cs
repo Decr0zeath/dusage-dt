@@ -3,10 +3,9 @@ using System.Windows.Media;
 
 namespace Dusage;
 
-/// <summary>A tiny usage bar: how much of the limit is used, plus a tick for how much of the window's time has passed.</summary>
+/// <summary>A usage bar: how much of the limit is used, plus a tick for how much of the window's time has passed.</summary>
 public sealed class Meter : FrameworkElement
 {
-    const double BarHeight = 4;
     static readonly Brush Track = Frozen(Color.FromArgb(0x38, 0xFF, 0xFF, 0xFF));
     static readonly Brush Tick = Frozen(Color.FromArgb(0xB0, 0xFF, 0xFF, 0xFF));
 
@@ -26,6 +25,9 @@ public sealed class Meter : FrameworkElement
     public double Pace { get => (double)GetValue(PaceProperty); set => SetValue(PaceProperty, value); }
 
     public Brush Fill { get => (Brush)GetValue(FillProperty); set => SetValue(FillProperty, value); }
+
+    /// <summary>Thickness of the bar itself; the tick runs the full height of the element.</summary>
+    public double BarHeight { get; init; } = 4;
 
     protected override void OnRender(DrawingContext dc)
     {

@@ -35,14 +35,14 @@ static class Native
         SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
 
     /// <summary>Pulls the window fully onto the nearest monitor, e.g. after that monitor was unplugged.
-    /// The taskbar area is allowed, so the widget can sit on it.</summary>
-    public static void KeepOnScreen(IntPtr hwnd)
+    /// The taskbar area is allowed unless <paramref name="clearOfTaskbar"/>, so the widget can sit on it.</summary>
+    public static void KeepOnScreen(IntPtr hwnd, bool clearOfTaskbar = false)
     {
         if (!GetWindowRect(hwnd, out var r)) return;
         var info = new MONITORINFO { cbSize = Marshal.SizeOf<MONITORINFO>() };
         if (!GetMonitorInfo(MonitorFromRect(ref r, MONITOR_DEFAULTTONEAREST), ref info)) return;
 
-        var screen = info.rcMonitor;
+        var screen = clearOfTaskbar ? info.rcWork : info.rcMonitor;
         int width = r.Right - r.Left, height = r.Bottom - r.Top;
         var x = Math.Clamp(r.Left, screen.Left, Math.Max(screen.Left, screen.Right - width));
         var y = Math.Clamp(r.Top, screen.Top, Math.Max(screen.Top, screen.Bottom - height));
@@ -60,13 +60,8 @@ static class Native
         return ((r.Left + r.Right) / 2 > (m.Left + m.Right) / 2, (r.Top + r.Bottom) / 2 > (m.Top + m.Bottom) / 2);
     }
 
-    /// <summary>Dark title bar to match the dark window (Windows 10 20H1 and later; older builds just ignore it).</summary>
-    public static void UseDarkTitleBar(IntPtr hwnd)
-    {
-        var on = 1;
-        if (DwmSetWindowAttribute(hwnd, 20, ref on, sizeof(int)) != 0)
-            DwmSetWindowAttribute(hwnd, 19, ref on, sizeof(int)); // pre-20H1 attribute number
-    }
+    /// <summary>Gives the window the keyboard focus; allowed right after the user clicked dusage's tray icon.</summary>
+    public static void Foreground(IntPtr hwnd) => SetForegroundWindow(hwnd);
 
     public static TimeSpan IdleTime()
     {
@@ -101,5 +96,5 @@ static class Native
     [DllImport("user32.dll")] static extern IntPtr MonitorFromRect(ref RECT rect, uint flags);
     [DllImport("user32.dll")] static extern bool GetMonitorInfo(IntPtr monitor, ref MONITORINFO info);
     [DllImport("user32.dll")] static extern bool GetLastInputInfo(ref LASTINPUTINFO info);
-    [DllImport("dwmapi.dll")] static extern int DwmSetWindowAttribute(IntPtr hwnd, int attribute, ref int value, int size);
+    [DllImport("user32.dll")] static extern bool SetForegroundWindow(IntPtr hwnd);
 }
