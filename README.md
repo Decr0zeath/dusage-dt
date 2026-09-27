@@ -98,7 +98,7 @@ It asks each service for your usage every 3 minutes by default (every 15 while y
 
 The CLIs' sign-ins are **only ever read**. dUsage/dt never refreshes, copies or writes their tokens, and sends each only to its service's endpoint above, so it can't interfere with the CLIs. The trade-off: a CLI's sign-in expires a while after you last used that CLI: a few hours for Claude Code, an hour for Gemini CLI, 15 minutes for Kimi Code. Until you use it again, the row keeps its last numbers with a faded logo. A bar whose reset time passes still drops to 0.
 
-**Sign in with GitHub** (in Settings › Services, for Copilot users without the GitHub CLI, say only in VS Code) shows a code to enter on github.com. That token is the one thing dUsage/dt keeps itself: in Windows Credential Manager (as `dusage:github.com`), never in its settings folder, and it's sent only to GitHub. **Sign out**, or uninstalling, removes it.
+**Sign in with GitHub** (in Settings › Services, for Copilot users without the GitHub CLI, say only in VS Code) shows a code to enter on github.com. That token is the one thing dUsage/dt keeps itself: in Windows Credential Manager (as `dusage:github.com`), never in its settings folder, and it's sent only to GitHub. **Sign out**, or uninstalling, removes it from your PC; to revoke it on GitHub too, remove dUsage/dt under [Authorized OAuth Apps](https://github.com/settings/applications). The token can only read your public profile.
 
 The endpoints are the ones the official tools call. They aren't documented public APIs and could change. If numbers stop appearing, run the probe below.
 
