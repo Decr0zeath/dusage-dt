@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Globalization;
 using System.Reflection;
 using System.Text.Json;
@@ -13,6 +14,9 @@ static class AppInfo
 
     public static readonly string Version =
         typeof(AppInfo).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion.Split('+')[0] ?? "0.0.0";
+
+    /// <summary>Opens a web page in the default browser.</summary>
+    public static void Open(string url) => Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
 }
 
 /// <summary>One rate-limit window (a 5-hour session or a weekly cap) as last reported.</summary>

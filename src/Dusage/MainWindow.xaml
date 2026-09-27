@@ -1,23 +1,33 @@
 <Window x:Class="Dusage.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:Dusage"
         Title="dUsage/dt"
         WindowStyle="None" AllowsTransparency="True" Background="Transparent"
         ResizeMode="NoResize" SizeToContent="WidthAndHeight"
         ShowInTaskbar="False" Topmost="True" WindowStartupLocation="Manual"
         UseLayoutRounding="True" SnapsToDevicePixels="True"
         TextOptions.TextFormattingMode="Display" TextOptions.TextRenderingMode="Grayscale"
-        FontFamily="Segoe UI" FontSize="11" Foreground="#E8E8E8">
+        FontFamily="Segoe UI" FontSize="11" Foreground="{StaticResource TextBrush}">
 
-    <Border x:Name="Pill" CornerRadius="7" Background="#FA161618" BorderBrush="#2EFFFFFF" BorderThickness="1" Padding="7,2,8,3"
+    <Border x:Name="Pill" CornerRadius="7" BorderBrush="#2EFFFFFF" BorderThickness="1" Padding="7,2,8,3"
             MouseLeftButtonDown="OnPillMouseDown"
             ToolTipOpening="OnTipOpening"
             ToolTipService.InitialShowDelay="400" ToolTipService.ShowDuration="60000" ToolTipService.Placement="Top">
+        <Border.Background>
+            <SolidColorBrush Color="{x:Static local:Palette.Deep}" Opacity="0.98"/>
+        </Border.Background>
         <Border.ToolTip>
-            <ToolTip x:Name="Tip" Background="#F21F2023" Foreground="#E8E8E8" BorderBrush="#33FFFFFF" Padding="10,8" FontSize="12"/>
+            <ToolTip x:Name="Tip" Foreground="{StaticResource TextBrush}" BorderBrush="#33FFFFFF" Padding="10,8" FontSize="12">
+                <ToolTip.Background>
+                    <SolidColorBrush Color="{x:Static local:Palette.Deep}" Opacity="0.95"/>
+                </ToolTip.Background>
+            </ToolTip>
         </Border.ToolTip>
         <Border.ContextMenu>
             <ContextMenu>
+                <MenuItem x:Name="UpdateItem" Visibility="Collapsed" Foreground="{StaticResource AccentBrush}" Click="OnUpdateClick"/>
+                <Separator x:Name="UpdateSeparator" Visibility="Collapsed"/>
                 <MenuItem Header="Refresh now" Click="OnRefreshClick"/>
                 <MenuItem Header="Settings…" Click="OnSettingsClick"/>
                 <Separator/>

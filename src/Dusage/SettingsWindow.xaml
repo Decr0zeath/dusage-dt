@@ -1,31 +1,37 @@
 <Window x:Class="Dusage.SettingsWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="dUsage/dt settings" Width="420" SizeToContent="Height" ResizeMode="CanMinimize"
-        WindowStartupLocation="CenterScreen" Background="#141517" Foreground="#E8E8E8"
+        xmlns:local="clr-namespace:Dusage"
+        Title="dUsage/dt settings" Icon="Assets/dusage.ico" Width="420" SizeToContent="Height" ResizeMode="CanMinimize"
+        WindowStartupLocation="CenterScreen" Background="{StaticResource WindowBrush}" Foreground="{StaticResource TextBrush}"
         FontFamily="Segoe UI" FontSize="12.5" UseLayoutRounding="True" SnapsToDevicePixels="True"
         TextOptions.TextFormattingMode="Display"
         Hyperlink.RequestNavigate="OnLink">
 
     <Window.Resources>
-        <SolidColorBrush x:Key="CardBrush" Color="#1D1E22"/>
-        <SolidColorBrush x:Key="LineBrush" Color="#2B2D33"/>
-        <SolidColorBrush x:Key="DimBrush" Color="#9AA0A6"/>
-        <SolidColorBrush x:Key="FaintBrush" Color="#71767D"/>
-        <SolidColorBrush x:Key="AccentBrush" Color="#4F8EF7"/>
+        <!-- Cards let a little of the sky through. -->
+        <SolidColorBrush x:Key="GlassBrush" Color="{x:Static local:Palette.Deep}" Opacity="0.88"/>
 
         <Style x:Key="SectionTitle" TargetType="TextBlock">
-            <Setter Property="FontSize" Value="11"/>
-            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="FontFamily" Value="{StaticResource Serif}"/>
+            <Setter Property="FontStyle" Value="Italic"/>
+            <Setter Property="FontSize" Value="14"/>
             <Setter Property="Foreground" Value="{StaticResource DimBrush}"/>
-            <Setter Property="Margin" Value="2,22,0,7"/>
+            <Setter Property="Margin" Value="2,20,0,7"/>
         </Style>
 
         <Style x:Key="Card" TargetType="Border">
-            <Setter Property="Background" Value="{StaticResource CardBrush}"/>
+            <Setter Property="Background" Value="{StaticResource GlassBrush}"/>
             <Setter Property="BorderBrush" Value="{StaticResource LineBrush}"/>
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="CornerRadius" Value="8"/>
+        </Style>
+
+        <Style x:Key="Note" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{StaticResource DimBrush}"/>
+            <Setter Property="FontSize" Value="11.5"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+            <Setter Property="Margin" Value="2,7,0,0"/>
         </Style>
 
         <!-- On/off switch -->
@@ -36,17 +42,17 @@
                 <Setter.Value>
                     <ControlTemplate TargetType="CheckBox">
                         <Grid Width="36" Height="20" Background="Transparent">
-                            <Border x:Name="Track" CornerRadius="10" Background="#3A3D44"/>
-                            <Ellipse x:Name="Knob" Width="14" Height="14" Margin="3,0" HorizontalAlignment="Left" Fill="#C4C8CE"/>
+                            <Border x:Name="Track" CornerRadius="10" Background="{StaticResource HoverBrush}"/>
+                            <Ellipse x:Name="Knob" Width="14" Height="14" Margin="3,0" HorizontalAlignment="Left" Fill="{StaticResource DimBrush}"/>
                         </Grid>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Track" Property="Background" Value="#484B53"/>
+                                <Setter TargetName="Track" Property="Background" Value="{StaticResource PressBrush}"/>
                             </Trigger>
                             <Trigger Property="IsChecked" Value="True">
                                 <Setter TargetName="Track" Property="Background" Value="{StaticResource AccentBrush}"/>
                                 <Setter TargetName="Knob" Property="HorizontalAlignment" Value="Right"/>
-                                <Setter TargetName="Knob" Property="Fill" Value="White"/>
+                                <Setter TargetName="Knob" Property="Fill" Value="{StaticResource TextBrush}"/>
                             </Trigger>
                             <Trigger Property="IsEnabled" Value="False">
                                 <Setter Property="Opacity" Value="0.35"/>
@@ -60,20 +66,20 @@
         <!-- One choice out of a few, as a row of pills -->
         <Style x:Key="Segment" TargetType="RadioButton">
             <Setter Property="Cursor" Value="Hand"/>
-            <Setter Property="Foreground" Value="#C9CDD3"/>
+            <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="RadioButton">
-                        <Border x:Name="Box" Background="#2A2C32" CornerRadius="5" Padding="8,3" Margin="4,0,0,0">
+                        <Border x:Name="Box" Background="{StaticResource ControlBrush}" CornerRadius="5" Padding="8,3" Margin="4,0,0,0">
                             <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Box" Property="Background" Value="#353840"/>
+                                <Setter TargetName="Box" Property="Background" Value="{StaticResource HoverBrush}"/>
                             </Trigger>
                             <Trigger Property="IsChecked" Value="True">
                                 <Setter TargetName="Box" Property="Background" Value="{StaticResource AccentBrush}"/>
-                                <Setter Property="Foreground" Value="White"/>
+                                <Setter Property="Foreground" Value="{StaticResource OnAccentBrush}"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -81,21 +87,115 @@
             </Setter>
         </Style>
 
+        <!-- A level, as a track with a knob -->
+        <Style x:Key="LevelPart" TargetType="RepeatButton">
+            <Setter Property="Focusable" Value="False"/>
+            <Setter Property="IsTabStop" Value="False"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="RepeatButton">
+                        <Grid Background="Transparent">
+                            <Border Height="4" CornerRadius="2" VerticalAlignment="Center" Background="{TemplateBinding Background}"/>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="Level" TargetType="Slider">
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="IsMoveToPointEnabled" Value="True"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Slider">
+                        <Track x:Name="PART_Track" Height="20">
+                            <Track.DecreaseRepeatButton>
+                                <RepeatButton Style="{StaticResource LevelPart}" Background="{StaticResource AccentBrush}" Command="Slider.DecreaseLarge"/>
+                            </Track.DecreaseRepeatButton>
+                            <Track.IncreaseRepeatButton>
+                                <RepeatButton Style="{StaticResource LevelPart}" Background="{StaticResource HoverBrush}" Command="Slider.IncreaseLarge"/>
+                            </Track.IncreaseRepeatButton>
+                            <Track.Thumb>
+                                <Thumb>
+                                    <Thumb.Template>
+                                        <ControlTemplate TargetType="Thumb">
+                                            <Ellipse Width="16" Height="16" Fill="{StaticResource TextBrush}"
+                                                     Stroke="{StaticResource CardBrush}" StrokeThickness="2"/>
+                                        </ControlTemplate>
+                                    </Thumb.Template>
+                                </Thumb>
+                            </Track.Thumb>
+                        </Track>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <Style x:Key="Flat" TargetType="Button">
             <Setter Property="Cursor" Value="Hand"/>
-            <Setter Property="Foreground" Value="#E8E8E8"/>
+            <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
+            <Setter Property="Background" Value="{StaticResource ControlBrush}"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
-                        <Border x:Name="Box" Background="#2A2C32" CornerRadius="5" Padding="12,4">
+                        <Border x:Name="Box" Background="{TemplateBinding Background}" CornerRadius="5" Padding="12,4">
                             <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Box" Property="Background" Value="#353840"/>
+                                <Setter TargetName="Box" Property="Background" Value="{StaticResource HoverBrush}"/>
                             </Trigger>
                             <Trigger Property="IsPressed" Value="True">
-                                <Setter TargetName="Box" Property="Background" Value="#41454E"/>
+                                <Setter TargetName="Box" Property="Background" Value="{StaticResource PressBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.5"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- The one thing to do: install an update -->
+        <Style x:Key="Primary" TargetType="Button">
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Foreground" Value="{StaticResource OnAccentBrush}"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Box" Background="{x:Static local:Palette.NebulaGradient}" CornerRadius="5" Padding="12,4">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Box" Property="Opacity" Value="0.88"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Box" Property="Opacity" Value="0.75"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.5"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Text that works as a button -->
+        <Style x:Key="Link" TargetType="Button">
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Foreground" Value="{StaticResource DimBrush}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <TextBlock x:Name="Label" Text="{Binding Content, RelativeSource={RelativeSource TemplatedParent}}" Background="Transparent" Padding="2,2"/>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Label" Property="TextDecorations" Value="Underline"/>
+                                <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -104,7 +204,7 @@
         </Style>
 
         <Style TargetType="Hyperlink">
-            <Setter Property="Foreground" Value="#8AB4F8"/>
+            <Setter Property="Foreground" Value="{StaticResource AccentBrush}"/>
             <Setter Property="TextDecorations" Value="{x:Null}"/>
             <Style.Triggers>
                 <Trigger Property="IsMouseOver" Value="True">
@@ -114,33 +214,66 @@
         </Style>
     </Window.Resources>
 
-    <StackPanel Margin="22,20,22,18">
-        <DockPanel>
-            <Image x:Name="Logo" Width="44" Height="44" DockPanel.Dock="Left" Margin="0,0,14,0"/>
-            <StackPanel VerticalAlignment="Center">
-                <TextBlock FontSize="20" FontWeight="SemiBold"><Run Text="dUsage"/><Run Text="/dt" Foreground="{StaticResource DimBrush}"/></TextBlock>
-                <TextBlock x:Name="Tagline" Foreground="{StaticResource DimBrush}" Margin="0,1,0,0"/>
+    <Grid>
+        <!-- Deep space behind everything; the settings float on it. -->
+        <local:Sky/>
+
+        <StackPanel Margin="22,20,22,14">
+            <!-- The name set as the fraction it is, d(Usage) over dt, in the logo's serif. -->
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <Image x:Name="Logo" Width="48" Height="48" Margin="0,0,14,0"/>
+                <StackPanel Grid.Column="1" VerticalAlignment="Center" HorizontalAlignment="Left">
+                    <TextBlock HorizontalAlignment="Center" FontFamily="{StaticResource Serif}" FontSize="19"><Run Text="d" FontStyle="Italic"/><Run Text="Usage"/></TextBlock>
+                    <Border Height="1.5" Margin="-3,1,-3,2" Background="{x:Static local:Palette.NebulaGradient}"/>
+                    <TextBlock HorizontalAlignment="Center" FontFamily="{StaticResource Serif}" FontSize="19" FontStyle="Italic" Text="dt"/>
+                </StackPanel>
+            </Grid>
+
+            <StackPanel x:Name="MainPage">
+                <TextBlock Style="{StaticResource SectionTitle}" Text="Services"/>
+                <Border Style="{StaticResource Card}">
+                    <StackPanel x:Name="Services"/>
+                </Border>
+                <TextBlock Style="{StaticResource Note}" Text="The widget shows signed-in services only."/>
+
+                <TextBlock Style="{StaticResource SectionTitle}" Text="Widget"/>
+                <Border Style="{StaticResource Card}">
+                    <StackPanel x:Name="Options"/>
+                </Border>
             </StackPanel>
-        </DockPanel>
 
-        <TextBlock Style="{StaticResource SectionTitle}" Text="SERVICES"/>
-        <Border Style="{StaticResource Card}">
-            <StackPanel x:Name="Services"/>
-        </Border>
-        <TextBlock Foreground="{StaticResource FaintBrush}" FontSize="11.5" Margin="2,7,0,0" TextWrapping="Wrap"
-                   Text="A service you aren't signed in to stays off the widget until you sign in."/>
+            <StackPanel x:Name="InfoPage" Visibility="Collapsed">
+                <TextBlock Style="{StaticResource SectionTitle}" Text="Updates"/>
+                <Border Style="{StaticResource Card}">
+                    <StackPanel x:Name="Updates"/>
+                </Border>
 
-        <TextBlock Style="{StaticResource SectionTitle}" Text="WIDGET"/>
-        <Border Style="{StaticResource Card}">
-            <StackPanel x:Name="Options"/>
-        </Border>
+                <TextBlock Style="{StaticResource SectionTitle}" Text="About"/>
+                <Border Style="{StaticResource Card}" Padding="14,10">
+                    <StackPanel TextBlock.Foreground="{StaticResource DimBrush}">
+                        <TextBlock TextWrapping="Wrap">
+                            <Run Text="Made by"/> <Hyperlink x:Name="AuthorLink"><Run Text="Decr0zeath"/></Hyperlink> <Run Text="with Claude."/>
+                        </TextBlock>
+                        <TextBlock Margin="0,4,0,0">
+                            <Hyperlink x:Name="RepoLink"><Run Text="GitHub"/></Hyperlink><Run Text="  ·  "/><Hyperlink x:Name="NotesLink"><Run Text="Release notes"/></Hyperlink><Run Text="  ·  "/><Hyperlink x:Name="LicenseLink"><Run Text="MIT License"/></Hyperlink>
+                        </TextBlock>
+                    </StackPanel>
+                </Border>
+                <TextBlock Style="{StaticResource Note}" FontSize="10.5"
+                           Text="Not affiliated with Anthropic or OpenAI. Claude is a trademark of Anthropic, PBC; ChatGPT and Codex are trademarks of OpenAI. Logos via Simple Icons."/>
+            </StackPanel>
 
-        <TextBlock Margin="2,22,0,0" Foreground="{StaticResource DimBrush}" FontSize="11.5" TextWrapping="Wrap">
-            <Run Text="Made by"/>
-            <Hyperlink x:Name="AuthorLink"><Run Text="Decr0zeath"/></Hyperlink>
-            <Run Text="with Claude  ·  "/><Hyperlink x:Name="LicenseLink"><Run Text="MIT License"/></Hyperlink><Run Text="  ·  "/><Hyperlink x:Name="RepoLink"><Run Text="GitHub"/></Hyperlink>
-        </TextBlock>
-        <TextBlock Margin="2,6,0,0" Foreground="{StaticResource FaintBrush}" FontSize="10.5" TextWrapping="Wrap"
-                   Text="Not affiliated with Anthropic or OpenAI. Claude is a trademark of Anthropic, PBC; ChatGPT and Codex are trademarks of OpenAI. Logos via Simple Icons."/>
-    </StackPanel>
+            <DockPanel Margin="0,16,0,0">
+                <Button x:Name="PageButton" Style="{StaticResource Link}" Content="Info" Click="OnPageClick" VerticalAlignment="Center"/>
+                <StackPanel x:Name="VersionPanel" Orientation="Horizontal" HorizontalAlignment="Right">
+                    <Button x:Name="FooterUpdate" Style="{StaticResource Primary}" Margin="0,0,10,0" Visibility="Collapsed" Click="OnUpdateClick"/>
+                    <TextBlock x:Name="VersionText" Foreground="{StaticResource DimBrush}" FontSize="11.5" VerticalAlignment="Center"/>
+                </StackPanel>
+            </DockPanel>
+        </StackPanel>
+    </Grid>
 </Window>

@@ -15,8 +15,13 @@ static class Logos
 
     const string OpenAIPath = "M22.2819 9.8211a5.9847 5.9847 0 0 0-.5157-4.9108 6.0462 6.0462 0 0 0-6.5098-2.9A6.0651 6.0651 0 0 0 4.9807 4.1818a5.9847 5.9847 0 0 0-3.9977 2.9 6.0462 6.0462 0 0 0 .7427 7.0966 5.98 5.98 0 0 0 .511 4.9107 6.051 6.051 0 0 0 6.5146 2.9001A5.9847 5.9847 0 0 0 13.2599 24a6.0557 6.0557 0 0 0 5.7718-4.2058 5.9894 5.9894 0 0 0 3.9977-2.9001 6.0557 6.0557 0 0 0-.7475-7.0729zm-9.022 12.6081a4.4755 4.4755 0 0 1-2.8764-1.0408l.1419-.0804 4.7783-2.7582a.7948.7948 0 0 0 .3927-.6813v-6.7369l2.02 1.1686a.071.071 0 0 1 .038.052v5.5826a4.504 4.504 0 0 1-4.4945 4.4944zm-9.6607-4.1254a4.4708 4.4708 0 0 1-.5346-3.0137l.142.0852 4.783 2.7582a.7712.7712 0 0 0 .7806 0l5.8428-3.3685v2.3324a.0804.0804 0 0 1-.0332.0615L9.74 19.9502a4.4992 4.4992 0 0 1-6.1408-1.6464zM2.3408 7.8956a4.485 4.485 0 0 1 2.3655-1.9728V11.6a.7664.7664 0 0 0 .3879.6765l5.8144 3.3543-2.0201 1.1685a.0757.0757 0 0 1-.071 0l-4.8303-2.7865A4.504 4.504 0 0 1 2.3408 7.872zm16.5963 3.8558L13.1038 8.364 15.1192 7.2a.0757.0757 0 0 1 .071 0l4.8303 2.7913a4.4944 4.4944 0 0 1-.6765 8.1042v-5.6772a.79.79 0 0 0-.407-.667zm2.0107-3.0231l-.142-.0852-4.7735-2.7818a.7759.7759 0 0 0-.7854 0L9.409 9.2297V6.8974a.0662.0662 0 0 1 .0284-.0615l4.8303-2.7866a4.4992 4.4992 0 0 1 6.6802 4.66zM8.3065 12.863l-2.02-1.1638a.0804.0804 0 0 1-.038-.0567V6.0742a4.4992 4.4992 0 0 1 7.3757-3.4537l-.142.0805L8.704 5.459a.7948.7948 0 0 0-.3927.6813zm1.0976-2.3654l2.602-1.4998 2.6069 1.4998v2.9994l-2.5974 1.4997-2.6067-1.4997Z";
 
-    static readonly Color ClaudeColor = Color.FromRgb(0xD9, 0x77, 0x57);
-    static readonly Color OpenAIColor = Color.FromRgb(0xEC, 0xEC, 0xEC);
+    // dUsage/dt's mark: an hourglass split by an integral sign, traced from the artwork; 10 units wide, 13.83 tall.
+    const string NebulaHalf = "M0.37,-0.01 0.35,0.02 0.34,0.68 0.37,1.54 0.46,1.99 0.62,2.43 0.93,2.97 1.35,3.55 1.87,4.14 2.81,5.14 3.11,5.51 3.35,5.89 3.47,6.12 3.56,6.38 3.63,6.71 3.63,7.22 3.56,7.59 3.4,7.99 3.17,8.34 2.91,8.62 2.66,8.84 1.47,9.65 1.19,9.88 1.02,10.05 0.9,10.21 0.79,10.42 0.72,10.63 0.7,10.93 0.74,11.21 0.88,11.52 1.06,11.75 1.24,11.9 1.54,12.04 1.82,12.1 2.2,12.08 2.45,12.02 2.71,11.9 2.9,11.78 3.15,11.55 3.39,11.29 3.56,11.05 3.74,10.72 3.88,10.4 4.07,9.79 4.19,9.25 4.81,5.77 5.18,4.02 5.51,3.04 5.67,2.69 6,2.13 6.34,1.71 6.8,1.33 7.06,1.19 7.24,1.12 7.43,1.07 7.66,1.05 7.85,1.07 7.97,1.17 8,1.33 7.91,1.64 7.91,1.75 7.96,1.89 8.06,1.99 8.25,2.06 8.5,2.07 8.86,2.06 9.09,2.01 9.32,1.9 9.52,1.68 9.59,1.47 9.59,1.14 9.54,0.96 9.45,0.75 9.33,0.58 9.11,0.37 8.95,0.25 8.71,0.13 8.43,0.04 8.18,-0Z";
+
+    const string StarlightHalf = "M7.62,2.45 7.41,2.49 7.24,2.56 6.96,2.77 6.79,2.97 6.67,3.15 6.49,3.62 6.35,4.21 5.82,7.69 5.42,9.77 5.29,10.26 5.06,10.86 4.85,11.31 4.63,11.68 4.18,12.24 3.83,12.57 3.53,12.78 3.04,13.04 2.76,13.14 2.43,13.2 2.15,13.21 1.89,13.19 1.66,13.08 1.53,12.94 1.43,12.64 1.36,12.5 1.24,12.36 1.07,12.26 0.93,12.21 0.75,12.19 0.56,12.21 0.38,12.27 0.21,12.37 0.07,12.52 -0.01,12.69 -0.03,12.92 0.02,13.13 0.13,13.34 0.28,13.5 0.44,13.63 0.77,13.79 1.21,13.87 10,13.86 10.01,12.59 9.96,12.13 9.87,11.71 9.68,11.21 9.47,10.84 9.03,10.26 8.7,9.91 7.85,9.12 7.38,8.62 7.05,8.11 6.91,7.69 6.87,7.29 6.89,6.96 6.96,6.66 7.14,6.24 7.4,5.86 7.66,5.58 8.39,4.94 8.77,4.56 8.96,4.25 9.03,3.97 9.05,3.69 8.98,3.36 8.82,3.06 8.69,2.9 8.39,2.66 8.11,2.51 7.83,2.45Z";
+
+    static readonly Color ClaudeColor = Palette.Giant;
+    static readonly Color OpenAIColor = Palette.Starlight;
 
     static readonly DrawingImage Claude = Mark(ClaudePath, ClaudeColor);
     static readonly DrawingImage OpenAI = Mark(OpenAIPath, OpenAIColor);
@@ -57,22 +62,26 @@ static class Logos
         return Frozen(group);
     }
 
-    /// <summary>A blue tile with two meter bars, drawn on a 16-unit grid so it stays crisp at 16 and 32 px.</summary>
+    /// <summary>
+    /// The hourglass in deep space: sand running out, and ∫ usage dt. Time and the integral, as the name has it.
+    /// The top half is the nebula, the bottom half starlight. On a 16-unit grid, the size it's most often seen at.
+    /// </summary>
     static DrawingImage CreateAppMark()
     {
-        var tile = new LinearGradientBrush(Color.FromRgb(0x5E, 0x9D, 0xFF), Color.FromRgb(0x2F, 0x62, 0xD9), 55);
-        var track = new SolidColorBrush(Color.FromArgb(0x59, 0xFF, 0xFF, 0xFF));
+        var hourglass = new DrawingGroup
+        {
+            // 13.83 units tall scaled to 12, centered on the tile.
+            Transform = new MatrixTransform(12 / 13.83, 0, 0, 12 / 13.83, (16 - 10 * 12 / 13.83) / 2, 2),
+        };
+        hourglass.Children.Add(new GeometryDrawing(Palette.NebulaGradient, null, Geometry.Parse(NebulaHalf)));
+        hourglass.Children.Add(new GeometryDrawing(Palette.Brush(Palette.Starlight), null, Geometry.Parse(StarlightHalf)));
+
+        var space = new RadialGradientBrush(Palette.Twilight, Palette.Void) { RadiusX = 0.7, RadiusY = 0.7 };
         var group = new DrawingGroup();
-        group.Children.Add(Rounded(tile, 0, 0, 16, 16, 3.5));
-        group.Children.Add(Rounded(track, 3, 4, 10, 3, 1.5));
-        group.Children.Add(Rounded(Brushes.White, 3, 4, 7, 3, 1.5));
-        group.Children.Add(Rounded(track, 3, 9, 10, 3, 1.5));
-        group.Children.Add(Rounded(Brushes.White, 3, 9, 4, 3, 1.5));
+        group.Children.Add(new GeometryDrawing(space, null, new RectangleGeometry(new Rect(0, 0, 16, 16), 3.5, 3.5)));
+        group.Children.Add(hourglass);
         return Frozen(group);
     }
-
-    static GeometryDrawing Rounded(Brush brush, double x, double y, double width, double height, double radius) =>
-        new(brush, null, new RectangleGeometry(new Rect(x, y, width, height), radius, radius));
 
     static DrawingImage Frozen(Drawing drawing)
     {

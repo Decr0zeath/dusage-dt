@@ -12,11 +12,13 @@ namespace Dusage;
 public partial class MainWindow : Window
 {
     static readonly TimeSpan IdleAfter = TimeSpan.FromMinutes(10), IdleInterval = TimeSpan.FromMinutes(15);
-    static readonly Brush NormalBrush = Solid(0xD4, 0xD8, 0xDE), WarnBrush = Solid(0xF2, 0xB8, 0x4B), HighBrush = Solid(0xF2, 0x60, 0x5C);
-    static readonly Brush TextBrush = Solid(0xE8, 0xE8, 0xE8), DimBrush = Solid(0x9A, 0x9F, 0xA6);
+    static readonly Brush NormalBrush = Palette.Brush(Palette.Starlight, 0xD8), WarnBrush = Palette.Brush(Palette.Amber), HighBrush = Palette.Brush(Palette.Flare);
+    static readonly Brush TextBrush = Palette.Brush(Palette.Starlight), DimBrush = Palette.Brush(Palette.Stardust), AccentBrush = Palette.Brush(Palette.Nebula);
+    static readonly FontFamily Serif = new("Georgia");
 
     readonly Settings _settings;
     readonly Provider[] _providers;
+    readonly Updater _updater = new();
     readonly List<Row> _rows = [];
     readonly DispatcherTimer _timer = new() { Interval = TimeSpan.FromSeconds(15) };
     readonly CancellationTokenSource _closing = new();
@@ -39,6 +41,7 @@ public partial class MainWindow : Window
 
     internal IReadOnlyList<Provider> Providers => _providers;
     internal Settings Settings => _settings;
+    internal Updater Updater => _updater;
 
     public MainWindow(Settings settings)
     {
@@ -59,6 +62,7 @@ public partial class MainWindow : Window
         ApplyLook();
 
         _timer.Tick += (_, _) => Tick();
+        _updater.Changed += OnUpdaterChanged;
         SystemEvents.PowerModeChanged += OnPowerModeChanged;
         SizeChanged += OnSizeChanged;
         UpdateRows();
@@ -68,7 +72,7 @@ public partial class MainWindow : Window
     void ApplyLook()
     {
         Topmost = _settings.Topmost;
-        Opacity = Math.Clamp(_settings.Opacity, 0.2, 1);
+        Opacity = Math.Clamp(_settings.Opacity, 0.4, 1);
     }
 
     protected override void OnSourceInitialized(EventArgs e)
@@ -198,6 +202,8 @@ public partial class MainWindow : Window
         foreach (var p in _providers)
             if (Wanted(p) && !p.Busy && now >= p.NextFetch && (!idle || now - p.LastAttempt >= IdleInterval))
                 _ = FetchAsync(p);
+        if (_settings.CheckForUpdates && now >= _updater.NextCheck)
+            _ = _updater.CheckAsync(_closing.Token);
         Render();
     }
 
@@ -416,9 +422,9 @@ public partial class MainWindow : Window
         foreach (var p in shown)
         {
             var state = p.State;
-            var heading = new TextBlock { Margin = new Thickness(0, panel.Children.Count == 0 ? 0 : 10, 0, 3) };
-            heading.Inlines.Add(new Run(p.Source.Name) { FontWeight = FontWeights.SemiBold, Foreground = new SolidColorBrush(Logos.ColorFor(p.Key)) });
-            if (state.Last?.Plan is { Length: > 0 } plan) heading.Inlines.Add(new Run("  " + Fmt.Title(plan)) { Foreground = DimBrush });
+            var heading = new TextBlock { FontFamily = Serif, FontSize = 13, Margin = new Thickness(0, panel.Children.Count == 0 ? 0 : 10, 0, 3) };
+            heading.Inlines.Add(new Run(p.Source.Name) { FontWeight = FontWeights.Bold, Foreground = new SolidColorBrush(Logos.ColorFor(p.Key)) });
+            if (state.Last?.Plan is { Length: > 0 } plan) heading.Inlines.Add(new Run("  " + Fmt.Title(plan)) { FontStyle = FontStyles.Italic, Foreground = DimBrush });
             panel.Children.Add(heading);
 
             var grid = new Grid();
@@ -455,6 +461,14 @@ public partial class MainWindow : Window
             FontSize = 11,
             Margin = new Thickness(0, 12, 0, 0),
         });
+        if (_updater.Available is { } release)
+            panel.Children.Add(new TextBlock
+            {
+                Text = $"dUsage/dt {release.Version} is out · right-click to update",
+                Foreground = AccentBrush,
+                FontSize = 11,
+                Margin = new Thickness(0, 6, 0, 0),
+            });
         return panel;
     }
 
@@ -511,10 +525,21 @@ public partial class MainWindow : Window
 
     void OnExitClick(object sender, RoutedEventArgs e) => Close();
 
-    static SolidColorBrush Solid(byte r, byte g, byte b)
+    void OnUpdateClick(object sender, RoutedEventArgs e) => _ = _updater.InstallAsync();
+
+    void OnUpdaterChanged()
     {
-        var brush = new SolidColorBrush(Color.FromRgb(r, g, b));
-        brush.Freeze();
-        return brush;
+        var shown = _updater.Available is not null;
+        UpdateItem.Visibility = UpdateSeparator.Visibility = shown ? Visibility.Visible : Visibility.Collapsed;
+        UpdateItem.Header = UpdateLabel(_updater);
+        UpdateItem.IsEnabled = !_updater.Installing;
+        _settingsWindow?.ShowUpdate();
     }
+
+    /// <summary>What the update button says, in the menu and in Settings.</summary>
+    internal static string UpdateLabel(Updater updater) =>
+        updater.Installing ? "Updating…"
+        : updater.Available is not { } release ? ""
+        : Updater.CanInstall ? $"Update to {release.Version}"
+        : $"Download {release.Version}…";
 }

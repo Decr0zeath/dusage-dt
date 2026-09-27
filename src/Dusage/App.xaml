@@ -1,4 +1,67 @@
 <Application x:Class="Dusage.App"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             ShutdownMode="OnMainWindowClose"/>
+             xmlns:local="clr-namespace:Dusage"
+             ShutdownMode="OnMainWindowClose">
+    <Application.Resources>
+        <!-- What each palette color (Palette.cs) is for. -->
+        <SolidColorBrush x:Key="WindowBrush" Color="{x:Static local:Palette.Void}"/>
+        <SolidColorBrush x:Key="CardBrush" Color="{x:Static local:Palette.Deep}"/>
+        <SolidColorBrush x:Key="LineBrush" Color="{x:Static local:Palette.Orbit}"/>
+        <SolidColorBrush x:Key="ControlBrush" Color="{x:Static local:Palette.Eclipse}"/>
+        <SolidColorBrush x:Key="HoverBrush" Color="{x:Static local:Palette.Twilight}"/>
+        <SolidColorBrush x:Key="PressBrush" Color="{x:Static local:Palette.Dusk}"/>
+        <SolidColorBrush x:Key="TextBrush" Color="{x:Static local:Palette.Starlight}"/>
+        <SolidColorBrush x:Key="DimBrush" Color="{x:Static local:Palette.Stardust}"/>
+        <SolidColorBrush x:Key="FaintBrush" Color="{x:Static local:Palette.Comet}"/>
+        <SolidColorBrush x:Key="AccentBrush" Color="{x:Static local:Palette.Nebula}"/>
+        <SolidColorBrush x:Key="OnAccentBrush" Color="{x:Static local:Palette.Void}"/>
+
+        <!-- The serif for names and headings, like the logo's; everything else stays Segoe UI. -->
+        <FontFamily x:Key="Serif">Georgia</FontFamily>
+
+        <!-- The widget's right-click menu, in the same colors instead of Windows' light menu. -->
+        <Style TargetType="ContextMenu">
+            <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
+            <Setter Property="FontFamily" Value="Segoe UI"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ContextMenu">
+                        <Border Background="{StaticResource CardBrush}" BorderBrush="{StaticResource LineBrush}" BorderThickness="1"
+                                CornerRadius="6" Padding="3">
+                            <ItemsPresenter/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style TargetType="MenuItem">
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="MenuItem">
+                        <Border x:Name="Box" Background="Transparent" CornerRadius="4" Padding="10,5,24,5">
+                            <ContentPresenter ContentSource="Header" RecognizesAccessKey="True"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsHighlighted" Value="True">
+                                <Setter TargetName="Box" Property="Background" Value="{StaticResource HoverBrush}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="{x:Static MenuItem.SeparatorStyleKey}" TargetType="Separator">
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Separator">
+                        <Border Height="1" Margin="6,3" Background="{StaticResource LineBrush}"/>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Application.Resources>
+</Application>

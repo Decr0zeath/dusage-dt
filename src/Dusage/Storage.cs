@@ -56,6 +56,7 @@ public sealed class Settings
     public bool ShowPace { get; set; } = true;
     public double RefreshMinutes { get; set; } = 3;
     public double Opacity { get; set; } = 1;
+    public bool CheckForUpdates { get; set; } = true;
 
     /// <summary>Services ("claude") and extra limits ("claude:weekly_opus") switched off in Settings.
     /// Everything else shows, so services added later appear without any setup.</summary>

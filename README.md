@@ -23,9 +23,9 @@ No admin rights, and nothing else to install (.NET is built in). The command:
 - adds a Start menu entry and an entry in Settings › Apps
 - sets it to start with Windows, then starts it
 
-Run the same command again to update.
+**Updates:** dUsage/dt checks GitHub for a new version once a day. When there is one, the tooltip says so and the right-click menu and Settings show **Update to …**. That runs the same installer in a PowerShell window, which checks the download, swaps the app and starts it again; your settings stay. You can turn the daily check off under Settings › Info, and running the install command again always updates too.
 
-**Downloading by hand instead?** Get `dusage.zip` from [Releases](https://github.com/Decr0zeath/dusage-dt/releases/latest), unzip it, and run `dusage.exe`. The app isn't code-signed, so Windows SmartScreen may say "Windows protected your PC"; choose **More info › Run anyway**. The install command doesn't hit that prompt.
+**Downloading by hand instead?** Get `dusage.zip` from [Releases](https://github.com/Decr0zeath/dusage-dt/releases/latest), unzip it, and run `dusage.exe`. The app isn't code-signed, so Windows SmartScreen may say "Windows protected your PC"; choose **More info › Run anyway**. The install command doesn't hit that prompt. A copy set up by hand still tells you about new versions, but its button opens the download page instead of updating.
 
 **Uninstall:** Settings › Apps › dUsage/dt › Uninstall. That removes the app, its Start menu entry, the start-with-Windows entry and its settings.
 
@@ -45,7 +45,7 @@ Hover for details: reset times, plan, and when it last updated.
 
 ![The hover tooltip with reset times for each window](docs/tooltip.png)
 
-**Drag** to move it anywhere, even onto the taskbar. **Double-click** to refresh. **Right-click** for *Refresh now*, *Settings…* and *Exit*.
+**Drag** to move it anywhere, even onto the taskbar. **Double-click** to refresh. **Right-click** for *Refresh now*, *Settings…* and *Exit* (and *Update to …* when there is a new version).
 
 ## Settings
 
@@ -54,7 +54,8 @@ Right-click the widget and choose **Settings…**, or launch dUsage/dt from the 
 ![The settings window: services with on/off switches, and widget options](docs/settings.png)
 
 - **Services:** switch Claude or ChatGPT on or off. If your plan has separate limits for particular models (for example, an Opus weekly cap on Claude Max), they appear under the service with their own switch, and turning one on adds a row for it.
-- **Widget:** always on top, start with Windows, the pace tick, how often to refresh (1–15 minutes), opacity, and a button to reset the position.
+- **Widget:** always on top, start with Windows, the pace tick, how often to refresh (1–15 minutes), opacity (a slider from 100% down to 40%), and a button to reset the position.
+- **Info** (bottom left): updates (check now, or switch off the daily check), credits, license, and the fine print.
 
 ## How it works
 
@@ -98,9 +99,12 @@ The app is a small WPF project in `src/Dusage`:
 - `ClaudeSource.cs` and `CodexSource.cs` fetch usage. To add a service, implement `IUsageSource` and give it a logo in `Logos.cs`.
 - `MainWindow` is the widget.
 - `SettingsWindow` is the settings window.
+- `Updater.cs` checks for and installs new releases; `Palette.cs` holds every color; `Sky.cs` draws the starry backdrop behind Settings.
 
 ## License
 
 [MIT](LICENSE) © Decr0zeath. Made with Claude.
 
 Not affiliated with Anthropic or OpenAI. Claude is a trademark of Anthropic, PBC; ChatGPT and Codex are trademarks of OpenAI. The logos come from [Simple Icons](https://simpleicons.org) (CC0).
+
+The icon is an hourglass split by an integral sign: time running out, and ∫ usage dt. Nebula above, starlight below, in deep space like the rest of the app.

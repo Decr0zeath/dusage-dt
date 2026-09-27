@@ -6,11 +6,16 @@
 # Per-user install; no admin rights needed. It downloads the latest release's dusage.zip, checks its SHA-256,
 # puts it in %LOCALAPPDATA%\Programs\dusage, adds a Start menu entry, an entry in Settings > Apps, and
 # "start with Windows" (switch that off in the widget's settings), then starts it.
+#
+# The widget's Update button runs the copy in the install folder with -Update, in a window of its own.
 
-param([switch]$Uninstall)
+param([switch]$Uninstall, [switch]$Update)
 
 & {
-    param([bool]$Uninstall)
+    param([bool]$Uninstall, [bool]$Update)
+
+    # With -Update the window closes as soon as this ends, so hold any error on screen until it's read.
+    trap { if ($Update) { Write-Host "The update failed: $_" -ForegroundColor Red; Read-Host 'Press Enter to close' | Out-Null }; break }
 
     $ErrorActionPreference = 'Stop'
     $ProgressPreference = 'SilentlyContinue' # the progress bar makes Invoke-WebRequest crawl on Windows PowerShell 5.1
@@ -91,9 +96,15 @@ param([switch]$Uninstall)
 
     Start-Process $exe
     Write-Host ''
+    if ($Update) {
+        Write-Host "Updated to dUsage/dt $version." -ForegroundColor Green
+        Start-Sleep 3
+        return
+    }
     Write-Host "dUsage/dt $version is installed and running." -ForegroundColor Green
     Write-Host '  Look for the small pill at the bottom-right of your screen; hover it for details.'
     Write-Host '  Right-click it for settings. It starts with Windows (you can turn that off there).'
     Write-Host '  It shows Claude and ChatGPT limits using your Claude Code and Codex sign-ins.'
-    Write-Host '  To update, run the same command again. To uninstall: Settings > Apps > dUsage/dt.'
-} $Uninstall.IsPresent
+    Write-Host '  It tells you when an update is out; right-click it to install one.'
+    Write-Host '  To uninstall: Settings > Apps > dUsage/dt.'
+} $Uninstall.IsPresent $Update.IsPresent
