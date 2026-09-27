@@ -36,15 +36,8 @@
             </ContextMenu>
         </Border.ContextMenu>
 
-        <!-- One row per service (logo, 5-hour bar, %, weekly bar, %), plus a row per extra limit; built in code. -->
-        <Grid x:Name="Body">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="Auto"/>
-                <ColumnDefinition Width="Auto"/>
-                <ColumnDefinition Width="Auto"/>
-                <ColumnDefinition Width="Auto"/>
-                <ColumnDefinition Width="Auto"/>
-            </Grid.ColumnDefinitions>
-        </Grid>
+        <!-- Per service: logo, 5-hour bar, %, weekly bar, %; the same again per extra limit. Stacked in rows (box)
+             or side by side (line); built in code. -->
+        <Grid x:Name="Body"/>
     </Border>
 </Window>

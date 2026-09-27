@@ -3,7 +3,7 @@ using System.Windows.Media;
 
 namespace Dusage;
 
-/// <summary>A usage bar: how much of the limit is used, plus a tick for how much of the window's time has passed.</summary>
+/// <summary>A usage bar: how much of the limit is used (or left), plus a tick for how much of the window's time has passed (or is left).</summary>
 public sealed class Meter : FrameworkElement
 {
     static readonly Brush Track = Frozen(Color.FromArgb(0x38, 0xFF, 0xFF, 0xFF));
@@ -18,10 +18,10 @@ public sealed class Meter : FrameworkElement
     public static readonly DependencyProperty FillProperty = DependencyProperty.Register(
         nameof(Fill), typeof(Brush), typeof(Meter), new FrameworkPropertyMetadata(Brushes.White, FrameworkPropertyMetadataOptions.AffectsRender));
 
-    /// <summary>Used share of the limit, 0..1. NaN when unknown.</summary>
+    /// <summary>Filled share of the bar, 0..1. NaN when unknown.</summary>
     public double Value { get => (double)GetValue(ValueProperty); set => SetValue(ValueProperty, value); }
 
-    /// <summary>Elapsed share of the window's time, 0..1. NaN hides the tick.</summary>
+    /// <summary>Where the tick goes, 0..1. NaN hides the tick.</summary>
     public double Pace { get => (double)GetValue(PaceProperty); set => SetValue(PaceProperty, value); }
 
     public Brush Fill { get => (Brush)GetValue(FillProperty); set => SetValue(FillProperty, value); }

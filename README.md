@@ -4,7 +4,7 @@
 
 A tiny always-on-top Windows widget that shows how much of your **Claude** and **ChatGPT** plan limits you've used: the 5-hour window and the weekly window, at a glance.
 
-![The widget: a Claude row and a ChatGPT row, each with a 5-hour bar and a weekly bar](docs/widget.png)
+![The widget: a Claude row and a ChatGPT row, each with a 5h bar and a 7d (weekly) bar and the percent used](docs/widget.png)
 
 > **Made for Claude Code and Codex users.** dUsage/dt reads the sign-in that Claude Code and Codex save on your PC. If you only use claude.ai or ChatGPT in a browser, there's nothing for it to read.
 
@@ -36,8 +36,13 @@ No admin rights, and nothing else to install (.NET is built in). The command:
 | Claude logo         | 5-hour window | weekly window |
 | OpenAI logo         | 5-hour window | weekly window |
 
-- The number is the percent used. A bar turns **amber at 75%** and **red at 90%**.
-- The thin **tick** marks how much of the window's *time* has passed. If the fill runs past the tick, you're using the limit faster than the clock.
+- The number is the percent used (or, if you pick it in Settings, the percent left). A bar turns **amber at 75%** used and **red at 90%**; both are adjustable.
+- The thin **tick** marks how much of the window's *time* has passed. If the fill runs past the tick, you're using the limit faster than the clock. When the numbers show what's left, the bars drain instead and the tick marks the time left, so a bar that falls short of its tick is running out early.
+- A tiny **5h** or **7d** before each bar says which is which (you can switch them off).
+- The rows above are the **Box** layout. **Line** puts the services side by side in one long row, which fits on the taskbar:
+
+  ![The widget in the Line layout: Claude and ChatGPT side by side in one row](docs/widget-line.png)
+
 - A **faded logo** means that row couldn't update just now (for example, Claude Code's sign-in expired). The numbers are the last ones it got; hover to see why.
 - A service you aren't signed in to doesn't appear at all.
 
@@ -51,14 +56,17 @@ Hover for details: reset times, plan, and when it last updated.
 
 Right-click the widget and choose **Expand**, click the tray icon, or launch dUsage/dt from the Start menu while it's running. The widget grows into a bigger panel in its place; the button in the top-right corner (or Esc) shrinks it back. That also brings back a widget you've lost track of.
 
-<img src="docs/expanded.png" width="400" align="top" alt="The expanded widget's Usage page: a card per service with a wide bar, the percent used and the reset time for each limit"> <img src="docs/settings.png" width="400" align="top" alt="Its Settings page: services with on/off switches, and widget options">
+<img src="docs/expanded.png" width="400" align="top" alt="The expanded widget's Usage page: a card per service with a wide bar, the percent used and the reset time for each limit"> <img src="docs/settings.png" width="400" align="top" alt="Its Settings page: collapsible sections for Services, Widget, Numbers and Colors, with Widget open">
 
 Pick a page at the bottom left:
 
 - **Usage:** every limit with a full-width bar, the percent used and when it resets, plus each service's plan and when it last updated.
-- **Settings:** changes apply immediately.
+- **Settings:** one section open at a time; click a title to open it. Changes apply immediately.
   - **Services:** switch Claude or ChatGPT on or off. If your plan has separate limits for particular models (for example, an Opus weekly cap on Claude Max), they appear under the service with their own switch, and turning one on adds a row for it.
-  - **Widget:** always on top, start with Windows, the pace tick, how often to refresh (1–15 minutes), opacity (a slider from 100% down to 40%), and a button to reset the position.
+  - **Widget:** the layout (a small box, or one line), the 5h/7d bar labels, always on top, start with Windows, how often to refresh (1–15 minutes), opacity (a slider from 100% down to 40%), and a button to reset the position.
+  - **Numbers:** show the percent used or the percent left; the % sign on the widget; reset times as the time, a countdown, or both; and the pace tick.
+  - **Colors:** switch the warning colors off, or choose when a bar turns amber (50–95% used) and red (55–100%).
+  - **Restore defaults**, under the sections, puts every setting back as it came (click twice to confirm). Start with Windows stays as it is.
 - **Info:** updates (check now, or switch off the daily check), credits, license, and the fine print.
 
 To quit, right-click the tray icon (or the widget) and choose **Exit**.
