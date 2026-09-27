@@ -12,7 +12,7 @@ namespace Dusage;
 static class GitHubSignIn
 {
     /// <summary>dUsage/dt's OAuth app on GitHub. Public by design: the device flow has no secret.</summary>
-    const string ClientId = "";
+    const string ClientId = "Ov23lisQljIiQHXhsBwe";
     const string Target = "dusage:github.com";
 
     static CancellationTokenSource? _cancel;
