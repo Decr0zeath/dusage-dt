@@ -51,7 +51,7 @@ Hover for details: reset times, plan, and when it last updated.
 
 Right-click the widget and choose **Expand**, click the tray icon, or launch dUsage/dt from the Start menu while it's running. The widget grows into a bigger panel in its place; the button in the top-right corner (or Esc) shrinks it back. That also brings back a widget you've lost track of.
 
-![The expanded widget: services with on/off switches, and widget options](docs/settings.png)
+<img src="docs/expanded.png" width="400" align="top" alt="The expanded widget's Usage page: a card per service with a wide bar, the percent used and the reset time for each limit"> <img src="docs/settings.png" width="400" align="top" alt="Its Settings page: services with on/off switches, and widget options">
 
 Pick a page at the bottom left:
 
