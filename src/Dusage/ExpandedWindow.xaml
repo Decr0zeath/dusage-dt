@@ -401,7 +401,7 @@
                             </StackPanel>
                         </Border>
                         <TextBlock Style="{StaticResource Note}" FontSize="10.5"
-                                   Text="Not affiliated with Anthropic or OpenAI. Claude is a trademark of Anthropic, PBC; ChatGPT and Codex are trademarks of OpenAI. Logos via Simple Icons."/>
+                                   Text="Not affiliated with Anthropic, OpenAI, GitHub, Google or Moonshot AI. Claude is a trademark of Anthropic, PBC; ChatGPT and Codex are trademarks of OpenAI; GitHub and Copilot are trademarks of GitHub, Inc.; Gemini is a trademark of Google LLC; Kimi is a trademark of Moonshot AI. Logos via Simple Icons."/>
                     </StackPanel>
                 </Grid>
 

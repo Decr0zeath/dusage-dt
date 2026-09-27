@@ -36,7 +36,7 @@
             </ContextMenu>
         </Border.ContextMenu>
 
-        <!-- Per service: logo, 5-hour bar, %, weekly bar, %; the same again per extra limit. Stacked in rows (box)
+        <!-- Per service: logo, short-window bar (5h), %, long-window bar (7d), %; the same again per extra limit. Stacked in rows (box)
              or side by side (line); built in code. -->
         <Grid x:Name="Body"/>
     </Border>

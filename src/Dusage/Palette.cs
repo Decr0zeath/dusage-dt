@@ -22,6 +22,7 @@ public static class Palette
         Nebula = Rgb(0xA58BFA),     // the accent
         Nova = Rgb(0xE879C9),       // where the nebula turns pink
         Giant = Rgb(0xD97757),      // Claude's own clay: a red giant
+        Rigel = Rgb(0x4796E3),      // Gemini's blue: a blue supergiant
         Amber = Rgb(0xF2B84B),      // a limit 75% used
         Flare = Rgb(0xF2605C);      // a limit 90% used
 

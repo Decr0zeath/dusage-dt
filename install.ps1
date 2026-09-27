@@ -42,6 +42,7 @@ param([switch]$Uninstall, [switch]$Update)
         foreach ($path in $dir, (Join-Path $env:LOCALAPPDATA 'dusage'), (Join-Path $env:TEMP '.net\dusage')) {
             Remove-Item $path -Recurse -Force -ErrorAction SilentlyContinue
         }
+        cmdkey /delete:dusage:github.com *> $null # Sign in with GitHub, if it was used
         Write-Host 'dUsage/dt is uninstalled.' -ForegroundColor Green
         return
     }
@@ -74,7 +75,7 @@ param([switch]$Uninstall, [switch]$Update)
     $link = $shell.CreateShortcut($shortcut)
     $link.TargetPath = $exe
     $link.WorkingDirectory = $dir
-    $link.Description = 'Claude and ChatGPT usage limits, at a glance'
+    $link.Description = 'Claude, ChatGPT, Copilot, Gemini and Kimi usage limits, at a glance'
     $link.Save()
 
     $version = (Get-Item $exe).VersionInfo.ProductVersion
@@ -104,7 +105,8 @@ param([switch]$Uninstall, [switch]$Update)
     Write-Host "dUsage/dt $version is installed and running." -ForegroundColor Green
     Write-Host '  Look for the small pill at the bottom-right of your screen; hover it for details.'
     Write-Host '  Right-click it for settings. It starts with Windows (you can turn that off there).'
-    Write-Host '  It shows Claude and ChatGPT limits using your Claude Code and Codex sign-ins.'
+    Write-Host '  It shows Claude, ChatGPT, GitHub Copilot, Gemini and Kimi limits using the sign-ins'
+    Write-Host '  Claude Code, Codex, the GitHub CLI, Gemini CLI and Kimi Code saved (Copilot can also sign in from Settings).'
     Write-Host '  It tells you when an update is out; right-click it to install one.'
     Write-Host '  To uninstall: Settings > Apps > dUsage/dt.'
 } $Uninstall.IsPresent $Update.IsPresent

@@ -27,20 +27,22 @@ static partial class Probe
         {
             var failures = 0;
             var now = DateTimeOffset.Now;
-            foreach (var source in new IUsageSource[] { new ClaudeSource(), new CodexSource() })
+            foreach (var source in IUsageSource.All())
             {
                 Console.WriteLine();
+                if (!source.HasSignIn())
+                {
+                    Console.WriteLine($"{source.Name}: not signed in. {source.SignInHint}");
+                    continue;
+                }
                 try
                 {
                     var snapshot = await source.FetchAsync(CancellationToken.None, raw ? Dump : null);
                     Console.WriteLine($"{source.Name} ({Fmt.Title(snapshot.Plan ?? "unknown plan")})");
-                    Line("5-hour", snapshot.Session, now);
-                    Line("Weekly", snapshot.Weekly, now);
-                    foreach (var extra in snapshot.Extra)
-                    {
-                        if (extra.Session is { } s) Line($"{extra.Label} 5-hour", s, now);
-                        if (extra.Weekly is { } w) Line($"{extra.Label} weekly", w, now);
-                    }
+                    var limits = snapshot.Limits().ToList();
+                    if (limits.Count == 0) Console.WriteLine("  no limits reported");
+                    foreach (var (name, window) in limits)
+                        Line(name, window, now);
                 }
                 catch (UsageException e)
                 {
@@ -52,10 +54,8 @@ static partial class Probe
         }).GetAwaiter().GetResult();
     }
 
-    static void Line(string label, UsageWindow? w, DateTimeOffset now) =>
-        Console.WriteLine(w is null
-            ? $"  {label,-14} no data"
-            : $"  {label,-14} {Fmt.Pct(w.PercentAt(now)),3}%  {Fmt.Reset(w, now)}");
+    static void Line(string label, UsageWindow w, DateTimeOffset now) =>
+        Console.WriteLine($"  {label,-18} {Fmt.Pct(w.PercentAt(now)),3}%  {Fmt.Reset(w, now)}");
 
     static void Dump(JsonElement root)
     {
