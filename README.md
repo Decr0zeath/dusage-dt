@@ -6,6 +6,8 @@ A tiny always-on-top Windows widget that shows how much of your **Claude**, **Ch
 
 ![The widget: a Claude row and a ChatGPT row, each with a 5h bar and a 7d (weekly) bar and the percent used, and a GitHub Copilot row with its chat and completions bars](docs/widget.png)
 
+![A 23-second animated demo: a 5-hour bar filling up to 92%, the widget tracking Claude, ChatGPT, GitHub Copilot, Gemini and Kimi, what the time tick on a bar means, the one-row layout sitting on the taskbar, and the expanded widget listing every reset time](docs/dusage-clip.gif)
+
 > **Made for people who code with AI.** dUsage/dt reads the sign-in that Claude Code, Codex, Gemini CLI, Kimi Code or the GitHub CLI saved on your PC; GitHub Copilot can also sign in from Settings. If you only use claude.ai, ChatGPT, Gemini or Kimi in a browser, there's nothing for it to read.
 
 ## Install
