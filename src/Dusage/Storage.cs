@@ -49,6 +49,9 @@ static class AppData
 /// <summary>The widget's shape: services stacked in a small box, or side by side in one line.</summary>
 public enum WidgetLayout { Box, Line }
 
+/// <summary>Where the numbers live: on the widget, wherever it's dragged, or built into the taskbar beside the tray icons.</summary>
+public enum WidgetPlacement { Floating, Tray }
+
 /// <summary>What the percentages count: how much of a limit is used, or how much is left.</summary>
 public enum NumberStyle { Used, Left }
 
@@ -62,6 +65,9 @@ public enum WidgetCorner { TopLeft, TopRight, BottomLeft, BottomRight }
 public sealed class Settings
 {
     const string FileName = "settings.json";
+
+    /// <summary>In the tray, the widget stays hidden and the position below waits for it to float again.</summary>
+    public WidgetPlacement Placement { get; set; } = WidgetPlacement.Floating;
 
     /// <summary>Widget position; null means the default spot above the clock.</summary>
     public double? Left { get; set; }

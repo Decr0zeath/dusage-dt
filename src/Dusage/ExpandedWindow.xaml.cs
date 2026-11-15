@@ -31,7 +31,7 @@ public partial class ExpandedWindow : Window
     {
         InitializeComponent();
         _widget = widget;
-        Topmost = Settings.Topmost;
+        Topmost = widget.ExpandedTopmost;
         Logo.Source = Logos.App;
         VersionText.Text = "v" + AppInfo.Version;
         AuthorLink.NavigateUri = new Uri(AppInfo.AuthorUrl);
@@ -68,6 +68,19 @@ public partial class ExpandedWindow : Window
         Left = _corner.Right ? widget.Left + widget.ActualWidth - Width : widget.Left;
         Top = _corner.Bottom ? widget.Top + widget.ActualHeight - content.DesiredSize.Height : widget.Top;
         Show();
+        Native.KeepOnScreen(_hwnd, clearOfTaskbar: true);
+    }
+
+    /// <summary>
+    /// Opens by a service in the taskbar, on the screen side of it, as the tray's own panels do; it then grows away
+    /// from the taskbar. Drawn off screen first, then moved there in pixels.
+    /// </summary>
+    internal void ShowNear(Native.PixelRect spot)
+    {
+        Left = Top = -20000;
+        Show();
+        UpdateLayout();
+        _corner = Native.PlaceNear(_hwnd, spot);
         Native.KeepOnScreen(_hwnd, clearOfTaskbar: true);
     }
 
@@ -284,14 +297,37 @@ public partial class ExpandedWindow : Window
         Reading.Children.Clear();
         Warnings.Children.Clear();
 
-        AddRow(Options, null, "Layout", "A small box, or one long line", Resource("DimBrush"),
-            Segments("Layout", Enum.GetValues<WidgetLayout>(), v => v.ToString(), Settings.Layout, v => Settings.Layout = v));
+        // In the tray the widget doesn't show, so the rows about its look dim rather than offer choices that do nothing.
+        TextBlock? placementLine = null;
+        var layout = Segments("Layout", Enum.GetValues<WidgetLayout>(), v => v.ToString(), Settings.Layout, v => Settings.Layout = v);
+        var barLabels = Switch("Bar labels", Settings.BarLabels, on => Settings.BarLabels = on);
+        var topmost = Switch("Always on top", Settings.Topmost, on => Settings.Topmost = on);
+        var opacity = Level("Opacity", 40, 100, 5, Settings.Opacity * 100, v => Settings.Opacity = v / 100, out _);
+        var reset = new Button { Content = "Reset", Style = (Style)FindResource("Flat") };
+        void ShowPlacement()
+        {
+            if (placementLine is null) return; // still building
+            var floating = Settings.Placement == WidgetPlacement.Floating;
+            foreach (var control in new UIElement[] { layout, barLabels, topmost, opacity, reset }) Applies(control, floating);
+            Say(placementLine, floating
+                ? "Anywhere on screen, or built into the taskbar beside the tray icons"
+                : "Built into the taskbar beside the tray icons: each logo with its 5-hour % top left and weekly % top right. The widget's own options wait until it floats again");
+        }
 
-        AddRow(Options, null, "Bar labels", "A tiny 5h, 7d and so on before each bar", Resource("DimBrush"),
-            Switch("Bar labels", Settings.BarLabels, on => Settings.BarLabels = on));
+        placementLine = AddRow(Options, null, "Placement", null, Resource("DimBrush"),
+            Segments("Placement", Enum.GetValues<WidgetPlacement>(), v => v == WidgetPlacement.Tray ? "In the tray" : "Floating",
+                Settings.Placement, v =>
+                {
+                    Settings.Placement = v;
+                    ShowPlacement();
+                    FitSettings(); // the detail's length changes, and with it the section's height
+                }));
 
-        AddRow(Options, null, "Always on top", null, null,
-            Switch("Always on top", Settings.Topmost, on => Settings.Topmost = on));
+        AddRow(Options, null, "Layout", "A small box, or one long line", Resource("DimBrush"), layout);
+
+        AddRow(Options, null, "Bar labels", "A tiny 5h, 7d and so on before each bar", Resource("DimBrush"), barLabels);
+
+        AddRow(Options, null, "Always on top", null, null, topmost);
 
         var startup = new CheckBox { IsChecked = Autostart.IsEnabled, Style = (Style)FindResource("Switch") };
         AutomationProperties.SetName(startup, "Start with Windows");
@@ -315,13 +351,12 @@ public partial class ExpandedWindow : Window
         AddRow(Options, null, "Refresh every", null, null,
             Segments<double>("Refresh every", [1, 3, 5, 10, 15], v => $"{v:0}m", Settings.RefreshMinutes, v => Settings.RefreshMinutes = v));
 
-        AddRow(Options, null, "Opacity", null, null,
-            Level("Opacity", 40, 100, 5, Settings.Opacity * 100, v => Settings.Opacity = v / 100, out _));
+        AddRow(Options, null, "Opacity", null, null, opacity);
 
-        var reset = new Button { Content = "Reset", Style = (Style)FindResource("Flat") };
         AutomationProperties.SetName(reset, "Reset position");
         reset.Click += (_, _) => _widget.ResetPosition();
         AddRow(Options, null, "Position", "Drag the widget anywhere, even onto the taskbar", Resource("DimBrush"), reset);
+        ShowPlacement();
 
         AddRow(Reading, null, "Show", "How much of each limit is used, or how much is left", Resource("DimBrush"),
             Segments("Show", Enum.GetValues<NumberStyle>(), v => v.ToString(), Settings.Numbers, v => Settings.Numbers = v));
@@ -491,7 +526,9 @@ public partial class ExpandedWindow : Window
 
     Brush Resource(string key) => (Brush)FindResource(key);
 
-    void AddRow(Panel card, UIElement? icon, string title, string? detail, Brush? detailBrush, FrameworkElement control, double indent = 14)
+    /// <summary>A settings row: its title and an optional detail line, with its control at the end. Returns the detail
+    /// line, collapsed while it has nothing to say, for rows whose detail changes with another setting.</summary>
+    TextBlock AddRow(Panel card, UIElement? icon, string title, string? detail, Brush? detailBrush, FrameworkElement control, double indent = 14)
     {
         if (card.Children.Count > 0)
             card.Children.Add(new Border { Height = 1, Background = Resource("LineBrush"), Margin = new Thickness(indent, 0, 0, 0) });
@@ -509,15 +546,15 @@ public partial class ExpandedWindow : Window
 
         var text = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
         text.Children.Add(new TextBlock { Text = title });
-        if (detail is not null)
-            text.Children.Add(new TextBlock
-            {
-                Text = detail,
-                Foreground = detailBrush,
-                FontSize = 11.5,
-                TextWrapping = TextWrapping.Wrap,
-                Margin = new Thickness(0, 1, 0, 0),
-            });
+        var line = new TextBlock
+        {
+            Foreground = detailBrush ?? Resource("DimBrush"),
+            FontSize = 11.5,
+            TextWrapping = TextWrapping.Wrap,
+            Margin = new Thickness(0, 1, 0, 0),
+        };
+        Say(line, detail);
+        text.Children.Add(line);
         Grid.SetColumn(text, 1);
         grid.Children.Add(text);
 
@@ -527,6 +564,21 @@ public partial class ExpandedWindow : Window
         grid.Children.Add(control);
 
         card.Children.Add(grid);
+        return line;
+    }
+
+    /// <summary>Sets a row's detail line; null hides it.</summary>
+    static void Say(TextBlock line, string? detail)
+    {
+        line.Text = detail ?? "";
+        line.Visibility = detail is null ? Visibility.Collapsed : Visibility.Visible;
+    }
+
+    /// <summary>Dims a control that doesn't apply just now, as the warning levels are with the colors off.</summary>
+    static void Applies(UIElement control, bool applies)
+    {
+        control.IsEnabled = applies;
+        control.Opacity = applies ? 1 : 0.4;
     }
 
     /// <summary>An on/off switch. It acts on Checked and Unchecked rather than Click: a screen reader flips a switch
