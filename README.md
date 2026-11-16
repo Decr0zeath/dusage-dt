@@ -57,6 +57,8 @@ Hover for details: reset times, plan, and when it last updated.
 
 **Drag** to move it anywhere, even onto the taskbar. **Double-click** to refresh. **Right-click** for *Refresh now*, *Expand* and *Exit* (and *Update to …* when there is a new version). dUsage/dt's hourglass icon in the notification area has the same menu, and clicking it expands the widget.
 
+**In the tray:** set **Placement** to **In the tray** (Settings › Widget) and the widget goes away; instead your services are built into the taskbar itself, just left of the tray icons, always in view (never in the **^** overflow). Each one is its logo with two tiny numbers above it: the 5-hour window at the top left and the weekly one at the top right (Gemini's daily limit sits top left, Copilot's monthly one top right), amber and red like the widget's. A faded logo means that service couldn't update just now (the numbers are the last ones it got), and dashes mean no numbers yet. Being part of the taskbar, it hides when the taskbar does, so fullscreen games cover it. Hover a service for its tooltip, click it for the expanded widget (click again to close it), and right-click for the menu. Made for the Windows 10 taskbar; Windows 11's hasn't been tested yet.
+
 ## Expanded widget
 
 Right-click the widget and choose **Expand**, click the tray icon, or launch dUsage/dt from the Start menu while it's running. The widget grows into a bigger panel in its place; the button in the top-right corner (or Esc) shrinks it back. That also brings back a widget you've lost track of.
@@ -68,7 +70,7 @@ Pick a page at the bottom left:
 - **Usage:** every limit with a full-width bar, the percent used and when it resets, plus each service's plan and when it last updated.
 - **Settings:** one section open at a time; click a title to open it. Changes apply immediately.
   - **Services:** switch each service on or off. If your plan has separate limits for particular models (for example, an Opus weekly cap on Claude Max, or Gemini's Flash), they appear under the service with their own switch, and turning one on adds a row for it. GitHub Copilot has **Sign in** here if the GitHub CLI isn't signed in (see below).
-  - **Widget:** the layout (a small box, or one line), the 5h/7d bar labels, always on top, start with Windows, how often to refresh (1–15 minutes), opacity (a slider from 100% down to 40%), and a button to reset the position.
+  - **Widget:** where the numbers go (the floating widget, or in the tray, built into the taskbar beside the tray icons), the layout (a small box, or one line), the 5h/7d bar labels, always on top, start with Windows, how often to refresh (1–15 minutes), opacity (a slider from 100% down to 40%), and a button to reset the position.
   - **Numbers:** show the percent used or the percent left; the % sign on the widget; reset times as the time, a countdown, or both; and the pace tick.
   - **Colors:** switch the warning colors off, or choose when a bar turns amber (50–95% used) and red (55–100%).
   - **Restore defaults**, under the sections, puts every setting back as it came (click twice to confirm). Start with Windows stays as it is.

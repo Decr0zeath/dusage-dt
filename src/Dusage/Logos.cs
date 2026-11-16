@@ -26,18 +26,27 @@ static class Logos
 
     const string StarlightHalf = "M7.62,2.45 7.41,2.49 7.24,2.56 6.96,2.77 6.79,2.97 6.67,3.15 6.49,3.62 6.35,4.21 5.82,7.69 5.42,9.77 5.29,10.26 5.06,10.86 4.85,11.31 4.63,11.68 4.18,12.24 3.83,12.57 3.53,12.78 3.04,13.04 2.76,13.14 2.43,13.2 2.15,13.21 1.89,13.19 1.66,13.08 1.53,12.94 1.43,12.64 1.36,12.5 1.24,12.36 1.07,12.26 0.93,12.21 0.75,12.19 0.56,12.21 0.38,12.27 0.21,12.37 0.07,12.52 -0.01,12.69 -0.03,12.92 0.02,13.13 0.13,13.34 0.28,13.5 0.44,13.63 0.77,13.79 1.21,13.87 10,13.86 10.01,12.59 9.96,12.13 9.87,11.71 9.68,11.21 9.47,10.84 9.03,10.26 8.7,9.91 7.85,9.12 7.38,8.62 7.05,8.11 6.91,7.69 6.87,7.29 6.89,6.96 6.96,6.66 7.14,6.24 7.4,5.86 7.66,5.58 8.39,4.94 8.77,4.56 8.96,4.25 9.03,3.97 9.05,3.69 8.98,3.36 8.82,3.06 8.69,2.9 8.39,2.66 8.11,2.51 7.83,2.45Z";
 
-    static readonly Dictionary<string, (DrawingImage Mark, Color Color)> Services = new()
+    static readonly Dictionary<string, (string Path, Color Color)> Paths = new()
     {
-        ["claude"] = (Mark(ClaudePath, Palette.Giant), Palette.Giant),
-        ["codex"] = (Mark(OpenAIPath, Palette.Starlight), Palette.Starlight),
-        ["copilot"] = (Mark(CopilotPath, Palette.Starlight), Palette.Starlight),
-        ["gemini"] = (Mark(GeminiPath, Palette.Rigel), Palette.Rigel),
-        ["kimi"] = (Mark(KimiPath, Palette.Starlight), Palette.Starlight),
+        ["claude"] = (ClaudePath, Palette.Giant),
+        ["codex"] = (OpenAIPath, Palette.Starlight),
+        ["copilot"] = (CopilotPath, Palette.Starlight),
+        ["gemini"] = (GeminiPath, Palette.Rigel),
+        ["kimi"] = (KimiPath, Palette.Starlight),
     };
+
+    static readonly Dictionary<string, (DrawingImage Mark, Color Color)> Services =
+        Paths.ToDictionary(s => s.Key, s => (Mark(s.Value.Path, s.Value.Color), s.Value.Color));
+
+    /// <summary>On a light taskbar, the marks drawn in starlight are drawn in the void instead; the colored ones keep their color.</summary>
+    static readonly Dictionary<string, DrawingImage> OnLight =
+        Paths.ToDictionary(s => s.Key, s => s.Value.Color == Palette.Starlight ? Mark(s.Value.Path, Palette.Void) : Services[s.Key].Mark);
 
     public static readonly DrawingImage App = CreateAppMark();
 
     public static DrawingImage For(string providerKey) => Services[providerKey].Mark;
+
+    public static DrawingImage For(string providerKey, bool onLight) => onLight ? OnLight[providerKey] : For(providerKey);
 
     public static Color ColorFor(string providerKey) => Services[providerKey].Color;
 

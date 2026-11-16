@@ -29,10 +29,16 @@ public partial class MainWindow : Window
     ExpandedWindow? _expanded;
     TrayIcon? _tray;
     IntPtr _hwnd;
-    bool _placed, _expandWhenPlaced;
+    bool _placed, _expandWhenPlaced, _started;
     /// <summary>The corner that stays still as the widget grows or shrinks; see <see cref="OnSizeChanged"/>.</summary>
     (bool Right, bool Bottom) _corner = (true, true);
     bool _gitHubSignedIn = GitHubSignIn.Token is not null;
+
+    /// <summary>In the tray: the services, what they show now, and the tooltip a hovered one opens.</summary>
+    TrayStrip? _trayStrip;
+    TrayCell[]? _trayCells;
+    bool _trayLight;
+    TrayTip? _trayTip;
 
     /// <summary>One line of the widget: a service's main limits, or one of its extra limits.</summary>
     sealed class Row(Provider provider, string? extraKey, FrameworkElement mark)
@@ -54,6 +60,12 @@ public partial class MainWindow : Window
     internal (bool Right, bool Bottom) Corner => _corner;
     internal Settings Settings => _settings;
     internal Updater Updater => _updater;
+
+    /// <summary>Placed in the tray: the widget stays hidden and the services sit in the taskbar, beside the tray icons.</summary>
+    bool InTray => _settings.Placement == WidgetPlacement.Tray;
+
+    /// <summary>Opened from the tray, the expanded view stays up like the tray's own panels.</summary>
+    internal bool ExpandedTopmost => _settings.Topmost || InTray;
 
     public MainWindow(Settings settings)
     {
@@ -86,7 +98,27 @@ public partial class MainWindow : Window
     {
         Topmost = _settings.Topmost;
         Opacity = Math.Clamp(_settings.Opacity, 0.4, 1);
-        if (_expanded is not null) _expanded.Topmost = _settings.Topmost;
+        if (_expanded is not null) _expanded.Topmost = ExpandedTopmost;
+    }
+
+    /// <summary>Shows the widget, or, placed in the tray, the services there: the widget then never shows until it floats.</summary>
+    public void Start()
+    {
+        if (!InTray)
+        {
+            Show();
+            return;
+        }
+        new WindowInteropHelper(this).EnsureHandle(); // the window, and with it the tray icon and the tray, without showing it
+        StartPolling();
+    }
+
+    void StartPolling()
+    {
+        if (_started) return;
+        _started = true;
+        Tick();
+        _timer.Start();
     }
 
     protected override void OnSourceInitialized(EventArgs e)
@@ -99,6 +131,9 @@ public partial class MainWindow : Window
         _tray = new TrayIcon(AppInfo.Name);
         _tray.Click += Expand;
         _tray.MenuRequested += ShowTrayMenu;
+        // `taskkill` without /F; closing from inside the tray window's own message would pull it out from under itself.
+        _tray.CloseRequested += () => Dispatcher.InvokeAsync(Close);
+        ShowTray(DateTimeOffset.Now); // in the tray, the services straight away
     }
 
     protected override void OnContentRendered(EventArgs e)
@@ -112,8 +147,7 @@ public partial class MainWindow : Window
         Native.KeepOnScreen(_hwnd);
         if (_settings.Left is { } left && _settings.Top is { } top && (left != Left || top != Top)) SavePosition();
         _placed = true;
-        Tick();
-        _timer.Start();
+        StartPolling();
         if (_expandWhenPlaced) Expand();
     }
 
@@ -125,6 +159,8 @@ public partial class MainWindow : Window
         GitHubSignIn.Changed -= OnGitHubSignInChanged;
         SaveState();
         _expanded?.Close();
+        _trayTip?.Close();
+        _trayStrip?.Dispose();
         _tray?.Dispose();
         base.OnClosed(e);
     }
@@ -135,6 +171,7 @@ public partial class MainWindow : Window
     {
         _settings.Save();
         ApplyLook();
+        ApplyPlacement();
         // A shorter refresh interval takes effect now rather than after the current wait.
         foreach (var p in _providers)
             if (p.NextFetch > p.LastAttempt + _settings.RefreshInterval && DateTimeOffset.Now >= p.HoldUntil)
@@ -158,23 +195,42 @@ public partial class MainWindow : Window
         PlaceInCorner();
     }
 
+    /// <summary>Hides the widget, or shows it again, as Placement has just been set. The tray follows in Render.</summary>
+    void ApplyPlacement()
+    {
+        if (InTray)
+        {
+            if (IsVisible) Hide();
+        }
+        else if (!IsVisible && _expanded is null)
+        {
+            Show(); // where it last floated; the first time, OnContentRendered places it
+            Native.KeepOnScreen(_hwnd);
+            if (Topmost) Native.BringToTop(_hwnd);
+        }
+    }
+
     /// <summary>Swaps the widget for the expanded view, opened over it. Collapsing it brings the widget back.
     /// Also what launching dusage again does, which recovers a widget you've lost track of.</summary>
-    public void Expand()
+    public void Expand() => ExpandFrom(null);
+
+    /// <summary>In the tray, the expanded view opens by the service clicked there, else by all of them.</summary>
+    void ExpandFrom(Native.PixelRect? spot)
     {
         if (_expanded is { } open)
         {
             open.Activate();
             return;
         }
-        if (!_placed)
+        if (!_placed && !InTray)
         {
             _expandWhenPlaced = true; // it opens over the widget, so the widget has to be in place first
             return;
         }
         _expanded = new ExpandedWindow(this);
         _expanded.Closed += OnCollapsed;
-        _expanded.ShowOver(this);
+        if (InTray) _expanded.ShowNear(spot ?? _trayStrip?.Bounds ?? Native.WorkAreaCorner());
+        else _expanded.ShowOver(this);
         _expanded.Activate();
         Hide();
     }
@@ -182,7 +238,7 @@ public partial class MainWindow : Window
     void OnCollapsed(object? sender, EventArgs e)
     {
         _expanded = null;
-        if (_closing.IsCancellationRequested) return; // exiting, not collapsing
+        if (_closing.IsCancellationRequested || InTray) return; // exiting, or the widget lives in the tray
         Show();
         Native.KeepOnScreen(_hwnd);
         if (Topmost) Native.BringToTop(_hwnd);
@@ -491,6 +547,7 @@ public partial class MainWindow : Window
             // Numbers stay readable when they can't update; only the logo fades, and the tooltip says why.
             row.Mark.Opacity = IsFresh(row.Provider.State, now) ? 1 : 0.35;
         }
+        ShowTray(now);
         _expanded?.ShowUsage();
 
         static void Label(TextBlock? label, Meter bar, UsageWindow? window)
@@ -548,17 +605,105 @@ public partial class MainWindow : Window
         text.Foreground = brush == NormalBrush ? TextBrush : brush;
     }
 
+    // ---- in the tray ----------------------------------------------------------------------------------------
+
+    /// <summary>
+    /// In the tray, the services shown sit beside the tray icons, each a logo with its short window's number (5-hour)
+    /// at the top left and its long window's (weekly) at the top right; with none shown, dUsage/dt's mark, to click
+    /// for Settings. Floating, the taskbar is left as it was.
+    /// </summary>
+    void ShowTray(DateTimeOffset now)
+    {
+        if (!InTray || _hwnd == IntPtr.Zero || _closing.IsCancellationRequested)
+        {
+            if (_trayStrip is null) return;
+            _trayTip?.Hide();
+            _trayStrip.Dispose();
+            (_trayStrip, _trayCells) = (null, null);
+            return;
+        }
+        if (_trayStrip is null)
+        {
+            _trayStrip = new TrayStrip();
+            _trayStrip.Click += OnTrayClick;
+            _trayStrip.MenuRequested += (_, _) =>
+            {
+                _trayTip?.Hide();
+                ShowTrayMenu();
+            };
+            _trayStrip.TipOpening += ShowTrayTip;
+            _trayStrip.TipClosing += () => _trayTip?.Hide();
+        }
+
+        var light = Native.LightTaskbar();
+        var shown = _providers.Where(Wanted).ToList();
+        TrayCell[] cells = shown.Count == 0
+            ? [new TrayCell(null, "", "", default, default, false, "no services to show, click to pick some")]
+            : shown.Select(p => TrayCellFor(p, now, light)).ToArray();
+        if (light == _trayLight && _trayCells is not null && cells.SequenceEqual(_trayCells)) return;
+        (_trayCells, _trayLight) = (cells, light);
+        _trayStrip.Show(cells, light);
+    }
+
+    /// <summary>A service in the tray: its numbers colored as on the widget, for the taskbar's light or dark.</summary>
+    TrayCell TrayCellFor(Provider p, DateTimeOffset now, bool light)
+    {
+        var (session, weekly) = (p.State.Last?.Session, p.State.Last?.Weekly);
+        var none = session is null && weekly is null;
+        var fresh = IsFresh(p.State, now);
+        var counts = _settings.Numbers == NumberStyle.Left ? "left" : "used";
+        var spoken = none ? $"{p.Source.Name}, no numbers yet"
+            : $"{p.Source.Name}, " + string.Join(", ", new[] { session, weekly }.OfType<UsageWindow>()
+                  .Select(w => $"{WindowName(w)} {Fmt.Pct(_settings.Count(w.PercentAt(now)))}% {counts}"))
+              + (fresh ? "" : ", not updating");
+        var (left, leftInk) = Number(session);
+        var (right, rightInk) = Number(weekly);
+        return new TrayCell(p.Key, left, right, leftInk, rightInk, !fresh, spoken);
+
+        // A missing window leaves its corner empty; a dash in each says there are no numbers yet.
+        (string, Color) Number(UsageWindow? w)
+        {
+            if (w is null) return (none ? "–" : "", light ? Palette.Comet : Palette.Stardust);
+            var used = w.PercentAt(now);
+            var ink = !_settings.WarningColors ? (light ? Palette.Void : Palette.Starlight)
+                : used >= _settings.RedAt ? (light ? Palette.FlareInk : Palette.Flare)
+                : used >= _settings.AmberAt ? (light ? Palette.AmberInk : Palette.Amber)
+                : light ? Palette.Void : Palette.Starlight;
+            return (Fmt.Pct(_settings.Count(used)), ink);
+        }
+    }
+
+    static string WindowName(UsageWindow w) => (w.Name ?? Fmt.Window(w.Length)).ToLowerInvariant();
+
+    /// <summary>A click in the tray opens the expanded view by that service, or closes it, as the tray's panels do.</summary>
+    void OnTrayClick(int cell, Native.PixelRect spot)
+    {
+        _trayTip?.Hide();
+        if (_expanded is { } open) open.Close();
+        else ExpandFrom(spot);
+    }
+
+    /// <summary>The mouse rests on a service in the tray: its part of the widget's tooltip, by it.</summary>
+    void ShowTrayTip(int cell, Native.PixelRect spot)
+    {
+        if (_expanded is not null || Pill.ContextMenu.IsOpen || _trayCells is not { } cells || cell >= cells.Length) return;
+        var service = cells[cell].Key is { } key ? _providers.FirstOrDefault(p => p.Key == key) : null;
+        _trayTip ??= new TrayTip();
+        _trayTip.ShowAt(BuildTip(service, inTray: true), spot);
+    }
+
     void OnTipOpening(object sender, ToolTipEventArgs e) => Tip.Content = BuildTip();
 
-    StackPanel BuildTip()
+    /// <summary>The widget's tooltip: every service shown, or, <paramref name="inTray"/>, just the one hovered there.</summary>
+    StackPanel BuildTip(Provider? only = null, bool inTray = false)
     {
         var now = DateTimeOffset.Now;
         var panel = new StackPanel();
         Grid.SetIsSharedSizeScope(panel, true); // line the columns up across services
 
-        var shown = _providers.Where(Wanted).ToList();
+        var shown = only is not null ? [only] : _providers.Where(Wanted).ToList();
         if (shown.Count == 0)
-            panel.Children.Add(new TextBlock { Text = "Nothing to show yet. Double-click to pick services.", Foreground = DimBrush });
+            panel.Children.Add(new TextBlock { Text = $"Nothing to show yet. {(inTray ? "Click" : "Double-click")} to pick services.", Foreground = DimBrush });
 
         foreach (var p in shown)
         {
@@ -588,11 +733,17 @@ public partial class MainWindow : Window
         }
         var left = _settings.Numbers == NumberStyle.Left;
         var tick = !_settings.ShowPace ? "" : left ? " · tick: time left in the window" : " · tick: time elapsed in the window";
+        // In the tray, which corner is which: "Top left: 5-hour · top right: weekly", or just the one there is.
+        var corners = string.Join(" · ", new[] { ("top left", only?.State.Last?.Session), ("top right", only?.State.Last?.Weekly) }
+            .Where(c => c.Item2 is not null).Select(c => $"{c.Item1}: {WindowName(c.Item2!)}"));
         panel.Children.Add(new TextBlock
         {
-            Text = $"Left bar: {Kinds(w => w.Session, "5-hour")} · right bar: {Kinds(w => w.Weekly, "weekly")}"
-                 + (left ? " · numbers: % left" : "") + tick + "\n"
-                 + "Drag to move · double-click to refresh · right-click to expand",
+            Text = inTray
+                ? (corners.Length == 0 ? "" : Fmt.Title(corners) + (left ? " · numbers: % left" : " · numbers: % used") + "\n")
+                  + (only is null ? "Right-click for the menu" : "Click for every limit · right-click for the menu")
+                : $"Left bar: {Kinds(w => w.Session, "5-hour")} · right bar: {Kinds(w => w.Weekly, "weekly")}"
+                  + (left ? " · numbers: % left" : "") + tick + "\n"
+                  + "Drag to move · double-click to refresh · right-click to expand",
             Foreground = DimBrush,
             FontSize = 11,
             Margin = new Thickness(0, 12, 0, 0),

@@ -10,8 +10,8 @@ namespace Dusage;
 /// </summary>
 sealed class TrayIcon : IDisposable
 {
-    const int WM_CONTEXTMENU = 0x007B, WM_CALLBACK = 0x8000 + 1, NIN_SELECT = 0x0400, NIN_KEYSELECT = 0x0401;
-    const int SM_CXSMICON = 49, WS_EX_TOOLWINDOW = 0x80;
+    const int WM_CLOSE = 0x0010, WM_CONTEXTMENU = 0x007B, WM_CALLBACK = 0x8000 + 1, NIN_SELECT = 0x0400, NIN_KEYSELECT = 0x0401;
+    const int SM_CXSMICON = 49, WS_EX_TOOLWINDOW = 0x80, WS_EX_TOPMOST = 0x8;
     const uint NIM_ADD = 0, NIM_DELETE = 2, NIM_SETVERSION = 4, NOTIFYICON_VERSION_4 = 4;
     const uint NIF_MESSAGE = 0x1, NIF_ICON = 0x2, NIF_TIP = 0x4, NIF_SHOWTIP = 0x80;
 
@@ -24,11 +24,17 @@ sealed class TrayIcon : IDisposable
 
     public event Action? Click;
     public event Action? MenuRequested;
+    /// <summary>
+    /// Asked to close, as `taskkill` (without /F) asks the process's first window that nothing owns. This window
+    /// is topmost, so it comes first. Left to Windows, it would close alone and take the icon with it.
+    /// </summary>
+    public event Action? CloseRequested;
 
     public TrayIcon(string tip)
     {
-        // An invisible window of its own receives the icon's messages.
-        _window = new HwndSource(new HwndSourceParameters("dusage tray") { Width = 0, Height = 0, WindowStyle = 0, ExtendedWindowStyle = WS_EX_TOOLWINDOW });
+        // An invisible window of its own receives the icon's messages. Topmost, though it never shows, so it's ahead of
+        // WPF's and the input method's hidden windows when `taskkill` looks for a window to ask.
+        _window = new HwndSource(new HwndSourceParameters("dusage tray") { Width = 0, Height = 0, WindowStyle = 0, ExtendedWindowStyle = WS_EX_TOOLWINDOW | WS_EX_TOPMOST });
         _window.AddHook(OnMessage);
         _icon = LoadIcon(GetSystemMetrics(SM_CXSMICON));
         _tip = tip;
@@ -80,6 +86,11 @@ sealed class TrayIcon : IDisposable
         else if (msg == TaskbarCreated)
         {
             Add();
+        }
+        else if (msg == WM_CLOSE)
+        {
+            CloseRequested?.Invoke();
+            handled = true;
         }
         return IntPtr.Zero;
     }

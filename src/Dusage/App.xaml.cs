@@ -43,7 +43,7 @@ public partial class App : Application
         var settings = Settings.Load();
         var widget = new MainWindow(settings);
         MainWindow = widget;
-        widget.Show();
+        widget.Start();
         ThreadPool.RegisterWaitForSingleObject(_summon, (_, _) => widget.Dispatcher.InvokeAsync(widget.Expand), null, Timeout.Infinite, executeOnlyOnce: false);
 
         if (settings.IsNew)

@@ -24,7 +24,9 @@ public static class Palette
         Giant = Rgb(0xD97757),      // Claude's own clay: a red giant
         Rigel = Rgb(0x4796E3),      // Gemini's blue: a blue supergiant
         Amber = Rgb(0xF2B84B),      // a limit 75% used
-        Flare = Rgb(0xF2605C);      // a limit 90% used
+        Flare = Rgb(0xF2605C),      // a limit 90% used
+        AmberInk = Rgb(0x7F5500),   // amber and flare on a light taskbar, 5:1 against it
+        FlareInk = Rgb(0xB3261E);
 
     /// <summary>The nebula as a gradient, top-left violet to bottom-right pink.</summary>
     public static readonly LinearGradientBrush NebulaGradient = Gradient(Nebula, Nova);

@@ -4,10 +4,10 @@ namespace Dusage;
 
 static class Native
 {
-    const int GWL_EXSTYLE = -20, WS_EX_TOOLWINDOW = 0x80;
+    const int GWL_EXSTYLE = -20, WS_EX_TOOLWINDOW = 0x80, WS_EX_TRANSPARENT = 0x20, WS_EX_NOACTIVATE = 0x08000000;
     const uint SWP_NOSIZE = 0x1, SWP_NOMOVE = 0x2, SWP_NOZORDER = 0x4, SWP_NOACTIVATE = 0x10;
-    const uint MONITOR_DEFAULTTONEAREST = 2;
-    const int WM_GETMINMAXINFO = 0x0024;
+    const uint MONITOR_DEFAULTTOPRIMARY = 1, MONITOR_DEFAULTTONEAREST = 2;
+    const int WM_GETMINMAXINFO = 0x0024, MDT_EFFECTIVE_DPI = 0;
     static readonly IntPtr HWND_TOPMOST = new(-1);
 
     /// <summary>Keeps the widget out of Alt+Tab and the taskbar.</summary>
@@ -62,6 +62,63 @@ static class Native
 
     /// <summary>Gives the window the keyboard focus; allowed right after the user clicked dusage's tray icon.</summary>
     public static void Foreground(IntPtr hwnd) => SetForegroundWindow(hwnd);
+
+    // ---- in the tray ---------------------------------------------------------------------------------------
+
+    /// <summary>A rectangle on screen in pixels: a service's spot in the tray.</summary>
+    public readonly record struct PixelRect(int Left, int Top, int Right, int Bottom);
+
+    /// <summary>
+    /// Moves the window next to a spot in the tray, on the screen side of the taskbar, as the tray's own panels open:
+    /// above a taskbar at the bottom, below one at the top, beside one at either side, and inside the monitor's work
+    /// area. Returns the corner it should keep still if it changes size, the one nearest the spot.
+    /// </summary>
+    public static (bool Right, bool Bottom) PlaceNear(IntPtr hwnd, PixelRect spot)
+    {
+        var anchor = new RECT { Left = spot.Left, Top = spot.Top, Right = spot.Right, Bottom = spot.Bottom };
+        var info = new MONITORINFO { cbSize = Marshal.SizeOf<MONITORINFO>() };
+        var monitor = MonitorFromRect(ref anchor, MONITOR_DEFAULTTONEAREST);
+        if (!GetWindowRect(hwnd, out var r) || !GetMonitorInfo(monitor, ref info)) return (true, true);
+        var work = info.rcWork;
+        var gap = GetDpiForMonitor(monitor, MDT_EFFECTIVE_DPI, out var dpi, out _) == 0 ? (int)Math.Round(8 * dpi / 96.0) : 8;
+        int width = r.Right - r.Left, height = r.Bottom - r.Top;
+        int middleX = (spot.Left + spot.Right) / 2 - width / 2, middleY = (spot.Top + spot.Bottom) / 2 - height / 2;
+
+        // Which side of the work area the spot is on says where the taskbar is; on an auto-hiding taskbar (inside
+        // the work area) the window goes above it.
+        int x, y;
+        bool right = true, bottom = true;
+        if (spot.Right <= work.Left) (x, y, right) = (work.Left + gap, middleY, false);
+        else if (spot.Left >= work.Right) (x, y) = (work.Right - gap - width, middleY);
+        else if (spot.Bottom <= work.Top) (x, y, bottom) = (middleX, work.Top + gap, false);
+        else (x, y) = (middleX, Math.Min(spot.Top, work.Bottom) - gap - height);
+
+        x = Math.Clamp(x, work.Left + gap, Math.Max(work.Left + gap, work.Right - gap - width));
+        y = Math.Clamp(y, work.Top + gap, Math.Max(work.Top + gap, work.Bottom - gap - height));
+        SetWindowPos(hwnd, IntPtr.Zero, x, y, 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
+        return (right, bottom);
+    }
+
+    /// <summary>The bottom-right corner of the main monitor's work area, for a window to open from when the tray
+    /// can't say where the services are.</summary>
+    public static PixelRect WorkAreaCorner()
+    {
+        var info = new MONITORINFO { cbSize = Marshal.SizeOf<MONITORINFO>() };
+        var origin = new RECT();
+        GetMonitorInfo(MonitorFromRect(ref origin, MONITOR_DEFAULTTOPRIMARY), ref info);
+        return new PixelRect(info.rcWork.Right, info.rcWork.Bottom, info.rcWork.Right, info.rcWork.Bottom);
+    }
+
+    /// <summary>Whether the taskbar is light (Windows' "default app mode" for the system set to light).</summary>
+    public static bool LightTaskbar()
+    {
+        using var key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize");
+        return key?.GetValue("SystemUsesLightTheme") is int light && light != 0;
+    }
+
+    /// <summary>Keeps a window out of the way: it never takes the focus, and the mouse goes through it.</summary>
+    public static void MakeHoverOnly(IntPtr hwnd) =>
+        SetWindowLong(hwnd, GWL_EXSTYLE, GetWindowLong(hwnd, GWL_EXSTYLE) | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE | WS_EX_TRANSPARENT);
 
     public static TimeSpan IdleTime()
     {
@@ -167,4 +224,5 @@ static class Native
     [DllImport("user32.dll")] static extern bool GetMonitorInfo(IntPtr monitor, ref MONITORINFO info);
     [DllImport("user32.dll")] static extern bool GetLastInputInfo(ref LASTINPUTINFO info);
     [DllImport("user32.dll")] static extern bool SetForegroundWindow(IntPtr hwnd);
+    [DllImport("shcore.dll")] static extern int GetDpiForMonitor(IntPtr monitor, int type, out uint dpiX, out uint dpiY);
 }
