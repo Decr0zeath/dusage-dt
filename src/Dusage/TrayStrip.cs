@@ -36,7 +36,7 @@ sealed class TrayStrip : IDisposable
     const int ULW_ALPHA = 0x2, IDC_ARROW = 32512;
 
     // In device-independent pixels, as the taskbar's own scaling makes them.
-    const double NumberSize = 10, NumberLine = 10, LogoSize = 16, Gap = 1, NumberGap = 3, Padding = 8, End = 0;
+    const double NumberSize = 10, NumberLine = 10, LogoSize = 16, Gap = 1, NumberGap = 6, Padding = 8, End = 0;
 
     static readonly ConcurrentDictionary<IntPtr, TrayStrip> Windows = new();
     static readonly WndProc Proc = OnMessage;
@@ -58,8 +58,8 @@ sealed class TrayStrip : IDisposable
     int? _hover;
     /// <summary>Each cell's start and length along the strip, in pixels, and the strip's size.</summary>
     (int Start, int Length)[] _spans = [];
-    /// <summary>Each cell's number slots' width, in device-independent pixels.</summary>
-    double[] _slots = [];
+    /// <summary>Each cell's number slots' widths, left and right, in device-independent pixels.</summary>
+    (double Left, double Right)[] _slots = [];
     /// <summary>What the spans and slots were measured for, so the periodic check doesn't measure text again.</summary>
     (TrayCell[] Cells, uint Dpi, int Thickness, bool Horizontal, int Length)? _measured;
     int _width, _height;
@@ -256,20 +256,23 @@ sealed class TrayStrip : IDisposable
     /// <summary>
     /// Works out each cell's length along the strip for a taskbar <paramref name="thickness"/> pixels thick, and returns
     /// the strip's whole length. Each number is centered over its corner of the logo, in a slot as wide as two digits,
-    /// so the strip keeps its size as numbers change, growing only for a "100".
+    /// so the strip keeps its size as numbers change, growing only for a "100". Only that number's slot widens, so the
+    /// other number stays over its corner; the cell grows on both sides alike, so the logo stays in the middle.
     /// </summary>
     int Measure(int thickness)
     {
         if (_measured is { } m && m.Cells == _cells && m.Dpi == _dpi && m.Thickness == thickness && m.Horizontal == _horizontal) return m.Length;
         var scale = _dpi / 96.0;
         var spans = new (int, int)[_cells.Length];
-        var slots = new double[_cells.Length];
+        var slots = new (double, double)[_cells.Length];
+        var twoDigits = Width("88", scale);
         int at = 0;
         for (var i = 0; i < _cells.Length; i++)
         {
-            slots[i] = Math.Max(Width("88", scale), Math.Max(Width(_cells[i].Left, scale), Width(_cells[i].Right, scale)));
+            var (left, right) = (Math.Max(twoDigits, Width(_cells[i].Left, scale)), Math.Max(twoDigits, Width(_cells[i].Right, scale)));
+            slots[i] = (left, right);
             var length = _horizontal
-                ? Math.Max(2 * slots[i] + NumberGap, LogoSize) + 2 * Padding
+                ? Math.Max(2 * Math.Max(left, right) + NumberGap, LogoSize) + 2 * Padding
                 : NumberLine + Gap + Logo(thickness / scale) + Padding;
             var pixels = (int)Math.Round(length * scale);
             spans[i] = (at, pixels);
@@ -284,8 +287,14 @@ sealed class TrayStrip : IDisposable
     /// <summary>The logo's size: as big as fits under the numbers on a thin taskbar, at most <see cref="LogoSize"/>.</summary>
     static double Logo(double thickness) => Math.Max(10, Math.Min(LogoSize, thickness - NumberLine - Gap - 6));
 
+    /// <summary>
+    /// A number's width as <see cref="Paint"/> draws it, in Display mode. That rounds each digit's width to whole pixels,
+    /// so at small sizes the digits come out wider than the default measure says, and a slot measured the default way
+    /// clips its last digit at 100% scaling ("25" drawn as "2").
+    /// </summary>
     static double Width(string text, double scale) => text.Length == 0 ? 0
-        : new FormattedText(text, CultureInfo.CurrentCulture, FlowDirection.LeftToRight, Face, NumberSize, Brushes.White, scale).WidthIncludingTrailingWhitespace;
+        : new FormattedText(text, CultureInfo.CurrentCulture, FlowDirection.LeftToRight, Face, NumberSize, Brushes.White,
+            null, TextFormattingMode.Display, scale).WidthIncludingTrailingWhitespace;
 
     // ---- drawing -------------------------------------------------------------------------------------------
 
@@ -327,13 +336,17 @@ sealed class TrayStrip : IDisposable
         Push(pixels);
     }
 
-    /// <summary>A service: the logo, with a number centered over each of its top corners, all centered in the cell.</summary>
-    Grid Cell(TrayCell c, double slot, double thickness)
+    /// <summary>
+    /// A service: the logo, with a number centered over each of its top corners, all centered in the cell. Each number
+    /// sits in its own slot against the gap between them, so a "100" on one side leaves the other where it was.
+    /// </summary>
+    Grid Cell(TrayCell c, (double Left, double Right) slot, double thickness)
     {
+        var side = Math.Max(slot.Left, slot.Right);
         var numbers = new Grid { Height = NumberLine, HorizontalAlignment = HorizontalAlignment.Center };
-        foreach (var width in new[] { slot, NumberGap, slot }) numbers.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(width) });
-        numbers.Children.Add(Number(c.Left, c.LeftInk, 0));
-        numbers.Children.Add(Number(c.Right, c.RightInk, 2));
+        foreach (var width in new[] { side, NumberGap, side }) numbers.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(width) });
+        numbers.Children.Add(Number(c.Left, c.LeftInk, 0, slot.Left, HorizontalAlignment.Right));
+        numbers.Children.Add(Number(c.Right, c.RightInk, 2, slot.Right, HorizontalAlignment.Left));
 
         var mark = Logos.View(c.Key is null ? Logos.App : Logos.For(c.Key, _light), Logo(thickness));
         mark.HorizontalAlignment = HorizontalAlignment.Center;
@@ -349,11 +362,14 @@ sealed class TrayStrip : IDisposable
         return cell;
     }
 
-    static TextBlock Number(string text, Color ink, int column)
+    /// <summary>A number centered in its slot, <paramref name="slot"/> wide, against the gap on the <paramref name="side"/> given.</summary>
+    static TextBlock Number(string text, Color ink, int column, double slot, HorizontalAlignment side)
     {
         var number = new TextBlock
         {
             Text = text,
+            Width = slot,
+            HorizontalAlignment = side,
             Foreground = Palette.Brush(ink),
             FontFamily = Face.FontFamily,
             FontWeight = Face.Weight,
