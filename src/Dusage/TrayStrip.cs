@@ -34,6 +34,7 @@ sealed class TrayStrip : IDisposable
         WM_LBUTTONUP = 0x0202, WM_RBUTTONUP = 0x0205, WM_MOUSELEAVE = 0x02A3, MA_NOACTIVATE = 3;
     const uint SWP_NOACTIVATE = 0x10, TME_LEAVE = 0x2, EVENT_OBJECT_LOCATIONCHANGE = 0x800B, WINEVENT_SKIPOWNPROCESS = 0x2;
     const int ULW_ALPHA = 0x2, IDC_ARROW = 32512;
+    const uint GW_HWNDPREV = 3;
 
     // In device-independent pixels, as the taskbar's own scaling makes them.
     const double NumberSize = 10, NumberLine = 10, LogoSize = 16, Gap = 1, NumberGap = 6, Padding = 8, End = 0;
@@ -159,7 +160,7 @@ sealed class TrayStrip : IDisposable
         var notify = FindWindowEx(taskbar, IntPtr.Zero, "TrayNotifyWnd", null);
         var rebar = FindWindowEx(taskbar, IntPtr.Zero, "ReBarWindow32", null);
         var tasks = rebar == IntPtr.Zero ? IntPtr.Zero : FindWindowEx(rebar, IntPtr.Zero, "MSTaskSwWClass", null);
-        if (tasks == IntPtr.Zero || !IsWindowVisible(tasks)) tasks = IntPtr.Zero;
+        if (tasks == IntPtr.Zero || !IsWindowVisible(tasks) || !DrawsButtons(tasks)) tasks = IntPtr.Zero;
         if (tasks == IntPtr.Zero && (notify == IntPtr.Zero || !IsWindowVisible(notify))) return false;
 
         var host = tasks != IntPtr.Zero ? rebar : taskbar;
@@ -176,6 +177,19 @@ sealed class TrayStrip : IDisposable
         _hook = SetWinEventHook(EVENT_OBJECT_LOCATIONCHANGE, EVENT_OBJECT_LOCATIONCHANGE, IntPtr.Zero, _onMoved, process, thread, WINEVENT_SKIPOWNPROCESS);
         _dpi = 0; // measure and draw afresh
         return true;
+    }
+
+    /// <summary>
+    /// Whether the task band is what draws the task buttons. Windows 11 keeps the band's windows, visible and sized
+    /// like its buttons, but draws the taskbar in XAML laid over all of it, and leaves the band's button list hidden:
+    /// shortening the band there makes no room, and a window in it sits under the XAML, unseen. Windows 10 (and a
+    /// Windows 10 style taskbar brought back on Windows 11) shows that list.
+    /// </summary>
+    static bool DrawsButtons(IntPtr tasks)
+    {
+        if (Environment.OSVersion.Version.Build < 22000) return true;
+        var list = FindWindowEx(tasks, IntPtr.Zero, "MSTaskListWClass", null);
+        return list != IntPtr.Zero && IsWindowVisible(list);
     }
 
     /// <summary>Hands the task buttons back their room and drops the window (if Explorer hasn't already).</summary>
@@ -243,8 +257,11 @@ sealed class TrayStrip : IDisposable
             (width, height) = horizontal ? (need, thickness) : (thickness, need);
         }
 
+        // Moved, or no longer above everything beside it (on Windows 11, the XAML the taskbar is drawn in): put
+        // back, at the top.
         var now = RectIn(_host, _hwnd);
-        if (now.Left != x || now.Top != y || now.Right - now.Left != width || now.Bottom - now.Top != height)
+        if (now.Left != x || now.Top != y || now.Right - now.Left != width || now.Bottom - now.Top != height
+            || GetWindow(_hwnd, GW_HWNDPREV) != IntPtr.Zero)
             SetWindowPos(_hwnd, IntPtr.Zero, x, y, width, height, SWP_NOACTIVATE);
         if (width != _width || height != _height) repaint = true;
         (_width, _height) = (width, height);
@@ -579,6 +596,7 @@ sealed class TrayStrip : IDisposable
     [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern IntPtr FindWindowEx(IntPtr parent, IntPtr after, string? className, string? windowName);
     [DllImport("user32.dll")] static extern bool IsWindow(IntPtr hwnd);
     [DllImport("user32.dll")] static extern bool IsWindowVisible(IntPtr hwnd);
+    [DllImport("user32.dll")] static extern IntPtr GetWindow(IntPtr hwnd, uint relation);
     [DllImport("user32.dll")] static extern bool GetWindowRect(IntPtr hwnd, out RECT rect);
     [DllImport("user32.dll")] static extern int MapWindowPoints(IntPtr from, IntPtr to, ref RECT points, int count);
     [DllImport("user32.dll")] static extern bool MoveWindow(IntPtr hwnd, int x, int y, int width, int height, bool repaint);
