@@ -72,8 +72,8 @@ public partial class ExpandedWindow : Window
     }
 
     /// <summary>
-    /// Opens by a service in the taskbar, on the screen side of it, as the tray's own panels do; it then grows away
-    /// from the taskbar. Drawn off screen first, then moved there in pixels.
+    /// Opens by a service in the tray, on the screen side of the taskbar, as the tray's own panels do; it then grows
+    /// away from the taskbar. Drawn off screen first, then moved there in pixels.
     /// </summary>
     internal void ShowNear(Native.PixelRect spot)
     {
@@ -310,7 +310,7 @@ public partial class ExpandedWindow : Window
             var floating = Settings.Placement == WidgetPlacement.Floating;
             foreach (var control in new UIElement[] { layout, barLabels, topmost, opacity, reset }) Applies(control, floating);
             Say(placementLine, floating
-                ? "Anywhere on screen, or built into the taskbar beside the tray icons"
+                ? "Anywhere on screen, or in the tray: built into the taskbar beside the tray icons"
                 : "Built into the taskbar beside the tray icons: each logo with its 5-hour % top left and weekly % top right. The widget's own options wait until it floats again");
         }
 

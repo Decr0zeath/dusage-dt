@@ -63,35 +63,35 @@ static class Native
     /// <summary>Gives the window the keyboard focus; allowed right after the user clicked dusage's tray icon.</summary>
     public static void Foreground(IntPtr hwnd) => SetForegroundWindow(hwnd);
 
-    // ---- in the taskbar ------------------------------------------------------------------------------------
+    // ---- in the tray ---------------------------------------------------------------------------------------
 
-    /// <summary>A rectangle on screen in pixels: a service's spot on the taskbar.</summary>
+    /// <summary>A rectangle on screen in pixels: a service's spot in the tray.</summary>
     public readonly record struct PixelRect(int Left, int Top, int Right, int Bottom);
 
     /// <summary>
-    /// Moves the window next to a spot on the taskbar, on the screen side of it, as the tray's own panels open: above a
-    /// taskbar at the bottom, below one at the top, beside one at either side, and inside the monitor's work area.
-    /// Returns the corner it should keep still if it changes size, the one nearest the spot.
+    /// Moves the window next to a spot in the tray, on the screen side of the taskbar, as the tray's own panels open:
+    /// above a taskbar at the bottom, below one at the top, beside one at either side, and inside the monitor's work
+    /// area. Returns the corner it should keep still if it changes size, the one nearest the spot.
     /// </summary>
-    public static (bool Right, bool Bottom) PlaceNear(IntPtr hwnd, PixelRect icon)
+    public static (bool Right, bool Bottom) PlaceNear(IntPtr hwnd, PixelRect spot)
     {
-        var anchor = new RECT { Left = icon.Left, Top = icon.Top, Right = icon.Right, Bottom = icon.Bottom };
+        var anchor = new RECT { Left = spot.Left, Top = spot.Top, Right = spot.Right, Bottom = spot.Bottom };
         var info = new MONITORINFO { cbSize = Marshal.SizeOf<MONITORINFO>() };
         var monitor = MonitorFromRect(ref anchor, MONITOR_DEFAULTTONEAREST);
         if (!GetWindowRect(hwnd, out var r) || !GetMonitorInfo(monitor, ref info)) return (true, true);
         var work = info.rcWork;
         var gap = GetDpiForMonitor(monitor, MDT_EFFECTIVE_DPI, out var dpi, out _) == 0 ? (int)Math.Round(8 * dpi / 96.0) : 8;
         int width = r.Right - r.Left, height = r.Bottom - r.Top;
-        int middleX = (icon.Left + icon.Right) / 2 - width / 2, middleY = (icon.Top + icon.Bottom) / 2 - height / 2;
+        int middleX = (spot.Left + spot.Right) / 2 - width / 2, middleY = (spot.Top + spot.Bottom) / 2 - height / 2;
 
         // Which side of the work area the spot is on says where the taskbar is; on an auto-hiding taskbar (inside
         // the work area) the window goes above it.
         int x, y;
         bool right = true, bottom = true;
-        if (icon.Right <= work.Left) (x, y, right) = (work.Left + gap, middleY, false);
-        else if (icon.Left >= work.Right) (x, y) = (work.Right - gap - width, middleY);
-        else if (icon.Bottom <= work.Top) (x, y, bottom) = (middleX, work.Top + gap, false);
-        else (x, y) = (middleX, Math.Min(icon.Top, work.Bottom) - gap - height);
+        if (spot.Right <= work.Left) (x, y, right) = (work.Left + gap, middleY, false);
+        else if (spot.Left >= work.Right) (x, y) = (work.Right - gap - width, middleY);
+        else if (spot.Bottom <= work.Top) (x, y, bottom) = (middleX, work.Top + gap, false);
+        else (x, y) = (middleX, Math.Min(spot.Top, work.Bottom) - gap - height);
 
         x = Math.Clamp(x, work.Left + gap, Math.Max(work.Left + gap, work.Right - gap - width));
         y = Math.Clamp(y, work.Top + gap, Math.Max(work.Top + gap, work.Bottom - gap - height));
@@ -99,7 +99,7 @@ static class Native
         return (right, bottom);
     }
 
-    /// <summary>The bottom-right corner of the main monitor's work area, for a window to open from when the taskbar
+    /// <summary>The bottom-right corner of the main monitor's work area, for a window to open from when the tray
     /// can't say where the services are.</summary>
     public static PixelRect WorkAreaCorner()
     {

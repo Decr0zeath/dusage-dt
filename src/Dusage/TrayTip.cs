@@ -6,9 +6,9 @@ using System.Windows.Media;
 namespace Dusage;
 
 /// <summary>
-/// The tooltip of a service in the taskbar: the widget's tooltip, opened by resting the mouse on it. The taskbar
-/// isn't the app's to put a WPF tooltip in, so this is a small window of its own, in the widget tooltip's colors,
-/// that never takes the focus and lets the mouse through.
+/// The tooltip of a service in the tray: the widget's tooltip, opened by resting the mouse on it. The tray lives in
+/// Explorer's taskbar, no place for a WPF tooltip, so this is a small window of its own, in the widget tooltip's
+/// colors, that never takes the focus and lets the mouse through.
 /// </summary>
 sealed class TrayTip : Window
 {
@@ -39,7 +39,7 @@ sealed class TrayTip : Window
             Padding = new Thickness(10, 8, 10, 8),
         };
         Content = _box;
-        Left = Top = -20000; // drawn off screen first, then placed by the taskbar in pixels
+        Left = Top = -20000; // drawn off screen first, then placed by the tray in pixels
     }
 
     protected override void OnSourceInitialized(EventArgs e)
@@ -48,7 +48,7 @@ sealed class TrayTip : Window
         Native.MakeHoverOnly(new WindowInteropHelper(this).Handle);
     }
 
-    /// <summary>Shows <paramref name="content"/> next to a spot on the taskbar, on the screen side of it.</summary>
+    /// <summary>Shows <paramref name="content"/> next to a spot in the tray, on the screen side of the taskbar.</summary>
     public void ShowAt(UIElement content, Native.PixelRect spot)
     {
         _box.Child = content;

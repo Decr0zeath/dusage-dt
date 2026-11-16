@@ -10,14 +10,14 @@ using System.Windows.Threading;
 namespace Dusage;
 
 /// <summary>
-/// One service's spot on the taskbar: its logo, with its short window's number (5-hour) at the top left and its long
+/// One service's spot in the tray: its logo, with its short window's number (5-hour) at the top left and its long
 /// window's (weekly) at the top right. An empty number leaves its corner empty. <see cref="Key"/> null is dUsage/dt's
 /// own mark, shown while there are no services. <see cref="Name"/> is what it says to a screen reader.
 /// </summary>
-readonly record struct StripCell(string? Key, string Left, string Right, Color LeftInk, Color RightInk, bool Faded, string Name);
+readonly record struct TrayCell(string? Key, string Left, string Right, Color LeftInk, Color RightInk, bool Faded, string Name);
 
 /// <summary>
-/// The services, built into the taskbar just left of the notification area. It's a window of dUsage/dt's made a child
+/// The tray: the services, built into the taskbar just left of the notification area. It's a window of dUsage/dt's made a child
 /// of Explorer's taskbar, which shortens the task buttons' band to make room, as TrafficMonitor's taskbar window does.
 /// Being part of the taskbar, it hides when the taskbar does, slides away with it when it auto-hides, and stays under
 /// fullscreen games.
@@ -26,9 +26,9 @@ readonly record struct StripCell(string? Key, string Left, string Right, Color L
 /// thread, so a busy moment on the app's main thread can't stall the taskbar, nor the taskbar the app. Its events are
 /// raised on the thread that created it.
 /// </summary>
-sealed class TaskbarStrip : IDisposable
+sealed class TrayStrip : IDisposable
 {
-    const string ClassName = "dusage taskbar";
+    const string ClassName = "dusage tray strip";
     const int WS_CHILD = 0x40000000, WS_VISIBLE = 0x10000000, WS_CLIPSIBLINGS = 0x04000000, WS_EX_LAYERED = 0x80000;
     const int WM_DESTROY = 0x0002, WM_MOUSEACTIVATE = 0x0021, WM_MOUSEMOVE = 0x0200, WM_LBUTTONDOWN = 0x0201,
         WM_LBUTTONUP = 0x0202, WM_RBUTTONUP = 0x0205, WM_MOUSELEAVE = 0x02A3, MA_NOACTIVATE = 3;
@@ -38,7 +38,7 @@ sealed class TaskbarStrip : IDisposable
     // In device-independent pixels, as the taskbar's own scaling makes them.
     const double NumberSize = 10, NumberLine = 10, LogoSize = 16, Gap = 1, NumberGap = 3, Padding = 8, End = 0;
 
-    static readonly ConcurrentDictionary<IntPtr, TaskbarStrip> Windows = new();
+    static readonly ConcurrentDictionary<IntPtr, TrayStrip> Windows = new();
     static readonly WndProc Proc = OnMessage;
     static readonly Typeface Face = new(new FontFamily("Segoe UI"), FontStyles.Normal, FontWeights.SemiBold, FontStretches.Normal);
     static bool _registered;
@@ -53,7 +53,7 @@ sealed class TaskbarStrip : IDisposable
     int _tasksFull = -1, _tasksSet = -1;
     bool _horizontal, _layoutQueued, _tipOpen, _tracking, _pressed;
     uint _dpi;
-    StripCell[] _cells = [];
+    TrayCell[] _cells = [];
     bool _light;
     int? _hover;
     /// <summary>Each cell's start and length along the strip, in pixels, and the strip's size.</summary>
@@ -61,7 +61,7 @@ sealed class TaskbarStrip : IDisposable
     /// <summary>Each cell's number slots' width, in device-independent pixels.</summary>
     double[] _slots = [];
     /// <summary>What the spans and slots were measured for, so the periodic check doesn't measure text again.</summary>
-    (StripCell[] Cells, uint Dpi, int Thickness, bool Horizontal, int Length)? _measured;
+    (TrayCell[] Cells, uint Dpi, int Thickness, bool Horizontal, int Length)? _measured;
     int _width, _height;
     DispatcherTimer _check = null!, _tipDelay = null!;
 
@@ -69,7 +69,7 @@ sealed class TaskbarStrip : IDisposable
     public event Action<int, Native.PixelRect>? Click, MenuRequested, TipOpening;
     public event Action? TipClosing;
 
-    public TaskbarStrip()
+    public TrayStrip()
     {
         _main = Dispatcher.CurrentDispatcher;
         _onMoved = OnMoved;
@@ -81,7 +81,7 @@ sealed class TaskbarStrip : IDisposable
             ready.Set();
             Dispatcher.Run();
         })
-        { IsBackground = true, Name = "dusage taskbar" };
+        { IsBackground = true, Name = "dusage tray strip" };
         _thread.SetApartmentState(ApartmentState.STA);
         _thread.Start();
         ready.Wait();
@@ -107,7 +107,7 @@ sealed class TaskbarStrip : IDisposable
     }
 
     /// <summary>What to show: a cell per service, drawn for a light or dark taskbar.</summary>
-    public void Show(StripCell[] cells, bool light) => _own.InvokeAsync(() =>
+    public void Show(TrayCell[] cells, bool light) => _own.InvokeAsync(() =>
     {
         _cells = cells;
         _light = light;
@@ -328,7 +328,7 @@ sealed class TaskbarStrip : IDisposable
     }
 
     /// <summary>A service: the logo, with a number centered over each of its top corners, all centered in the cell.</summary>
-    Grid Cell(StripCell c, double slot, double thickness)
+    Grid Cell(TrayCell c, double slot, double thickness)
     {
         var numbers = new Grid { Height = NumberLine, HorizontalAlignment = HorizontalAlignment.Center };
         foreach (var width in new[] { slot, NumberGap, slot }) numbers.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(width) });

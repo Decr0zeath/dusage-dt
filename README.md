@@ -70,7 +70,7 @@ Pick a page at the bottom left:
 - **Usage:** every limit with a full-width bar, the percent used and when it resets, plus each service's plan and when it last updated.
 - **Settings:** one section open at a time; click a title to open it. Changes apply immediately.
   - **Services:** switch each service on or off. If your plan has separate limits for particular models (for example, an Opus weekly cap on Claude Max, or Gemini's Flash), they appear under the service with their own switch, and turning one on adds a row for it. GitHub Copilot has **Sign in** here if the GitHub CLI isn't signed in (see below).
-  - **Widget:** where the numbers go (the floating widget, or built into the taskbar beside the tray icons), the layout (a small box, or one line), the 5h/7d bar labels, always on top, start with Windows, how often to refresh (1–15 minutes), opacity (a slider from 100% down to 40%), and a button to reset the position.
+  - **Widget:** where the numbers go (the floating widget, or in the tray, built into the taskbar beside the tray icons), the layout (a small box, or one line), the 5h/7d bar labels, always on top, start with Windows, how often to refresh (1–15 minutes), opacity (a slider from 100% down to 40%), and a button to reset the position.
   - **Numbers:** show the percent used or the percent left; the % sign on the widget; reset times as the time, a countdown, or both; and the pace tick.
   - **Colors:** switch the warning colors off, or choose when a bar turns amber (50–95% used) and red (55–100%).
   - **Restore defaults**, under the sections, puts every setting back as it came (click twice to confirm). Start with Windows stays as it is.

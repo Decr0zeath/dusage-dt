@@ -49,7 +49,7 @@ static class AppData
 /// <summary>The widget's shape: services stacked in a small box, or side by side in one line.</summary>
 public enum WidgetLayout { Box, Line }
 
-/// <summary>Where the numbers live: on the widget, wherever it's dragged, or built into the taskbar beside the tray icons.</summary>
+/// <summary>Where the numbers live: on the widget, wherever it's dragged, or in the tray, built into the taskbar beside the tray icons.</summary>
 public enum WidgetPlacement { Floating, Tray }
 
 /// <summary>What the percentages count: how much of a limit is used, or how much is left.</summary>
