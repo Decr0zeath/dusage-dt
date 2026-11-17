@@ -110,6 +110,10 @@ public sealed class Settings
     /// Everything else shows, so services added later appear without any setup.</summary>
     public List<string> Hidden { get; set; } = [];
 
+    /// <summary>The version that ran last, so the first start after an update can say what's new. Not a preference:
+    /// Restore defaults keeps it. Settings saved before 1.4.2 don't have it.</summary>
+    public string? LastVersion { get; set; }
+
     /// <summary>No settings file yet: this is the first run.</summary>
     [JsonIgnore] public bool IsNew { get; private set; }
 

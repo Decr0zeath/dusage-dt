@@ -288,6 +288,35 @@
             </Setter>
         </Style>
 
+        <!-- What's new scrolls; a thin thumb in the controls' color rather than Windows' light scroll bar. -->
+        <Style TargetType="ScrollBar">
+            <Setter Property="Width" Value="5"/>
+            <Setter Property="MinWidth" Value="5"/>
+            <Setter Property="Margin" Value="0,8,4,8"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ScrollBar">
+                        <Track x:Name="PART_Track" IsDirectionReversed="True">
+                            <Track.Thumb>
+                                <Thumb Cursor="Hand">
+                                    <Thumb.Template>
+                                        <ControlTemplate TargetType="Thumb">
+                                            <Border x:Name="Knob" CornerRadius="2.5" Background="{StaticResource HoverBrush}"/>
+                                            <ControlTemplate.Triggers>
+                                                <Trigger Property="IsMouseOver" Value="True">
+                                                    <Setter TargetName="Knob" Property="Background" Value="{StaticResource DimBrush}"/>
+                                                </Trigger>
+                                            </ControlTemplate.Triggers>
+                                        </ControlTemplate>
+                                    </Thumb.Template>
+                                </Thumb>
+                            </Track.Thumb>
+                        </Track>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <Style TargetType="Hyperlink">
             <Setter Property="Foreground" Value="{StaticResource AccentBrush}"/>
             <Setter Property="TextDecorations" Value="{x:Null}"/>
@@ -388,7 +417,19 @@
                         <Border Style="{StaticResource Card}">
                             <StackPanel x:Name="Updates"/>
                         </Border>
-    
+
+                        <!-- This version's changes, or after an update every release's since the last version; from
+                             CHANGELOG.md, built in code. It scrolls rather than make every page taller. -->
+                        <StackPanel x:Name="NewsSection">
+                            <TextBlock x:Name="NewsTitle" Style="{StaticResource SectionTitle}"/>
+                            <Border Style="{StaticResource Card}">
+                                <!-- As tall as Info can be without outgrowing Settings, the tallest page. -->
+                                <ScrollViewer MaxHeight="240" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                                    <StackPanel x:Name="News" Margin="14,10,14,12"/>
+                                </ScrollViewer>
+                            </Border>
+                        </StackPanel>
+
                         <TextBlock Style="{StaticResource SectionTitle}" Text="About"/>
                         <Border Style="{StaticResource Card}" Padding="14,10">
                             <StackPanel TextBlock.Foreground="{StaticResource DimBrush}">

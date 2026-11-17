@@ -1,5 +1,6 @@
 # Push a tag like v1.2.0 to build dusage.exe and publish it as a GitHub release.
 # install.ps1 always installs the latest release.
+# CHANGELOG.md needs a "## 1.2.0" entry first: it becomes the release's notes, and the app shows it as What's new.
 name: Release
 
 on:
@@ -19,6 +20,23 @@ jobs:
         with:
           dotnet-version: 10.0.x
 
+      # Before building, so a release without notes stops here.
+      - name: Release notes
+        shell: pwsh
+        run: |
+          $version = '${{ github.ref_name }}'.TrimStart('v')
+          $lines = @(Get-Content CHANGELOG.md)
+          $heading = "^##\s+\[?v?$([regex]::Escape($version))\]?(\s|$)"
+          $start = ($lines | Select-String -Pattern $heading | Select-Object -First 1).LineNumber
+          if (-not $start) { throw "CHANGELOG.md has no '## $version' entry. Rename '## Unreleased' to '## $version - <date>' (or add one), then tag again." }
+          $next = ($lines | Select-Object -Skip $start | Select-String -Pattern '^##\s' | Select-Object -First 1).LineNumber
+          $last = if ($next) { $start + $next - 2 } else { $lines.Count - 1 }
+          $notes = if ($last -ge $start) { ($lines[$start..$last] -join "`n").Trim() } else { '' }
+          if (-not $notes) { throw "CHANGELOG.md's entry for $version is empty." }
+          New-Item -ItemType Directory release -Force | Out-Null
+          Set-Content release/notes.md $notes -NoNewline
+          Write-Host $notes
+
       - name: Build
         shell: pwsh
         run: |
@@ -36,4 +54,5 @@ jobs:
         run: >
           gh release create '${{ github.ref_name }}' release/dusage.zip release/dusage.zip.sha256
           --title 'dUsage/dt ${{ github.ref_name }}'
+          --notes-file release/notes.md
           --generate-notes

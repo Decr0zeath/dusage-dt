@@ -25,7 +25,7 @@ No admin rights, and nothing else to install (.NET is built in). The command:
 - adds a Start menu entry and an entry in Settings › Apps
 - sets it to start with Windows, then starts it
 
-**Updates:** dUsage/dt checks GitHub for a new version once a day. When there is one, the tooltip says so and the right-click menu and the expanded widget show **Update to …**. That runs the same installer in a PowerShell window, which checks the download, swaps the app and starts it again; your settings stay. You can turn the daily check off under Info in the expanded widget, and running the install command again always updates too.
+**Updates:** dUsage/dt checks GitHub for a new version once a day. When there is one, the tooltip says so and the right-click menu and the expanded widget show **Update to …**. That runs the same installer in a PowerShell window, which checks the download, swaps the app and starts it again; your settings stay. The first time the new version starts, the expanded widget opens on Info to show what was added, changed, fixed or removed (the [changelog](CHANGELOG.md) has every release). You can turn the daily check off under Info in the expanded widget, and running the install command again always updates too.
 
 **Downloading by hand instead?** Get `dusage.zip` from [Releases](https://github.com/Decr0zeath/dusage-dt/releases/latest), unzip it, and run `dusage.exe`. The app isn't code-signed, so Windows SmartScreen may say "Windows protected your PC"; choose **More info › Run anyway**. The install command doesn't hit that prompt. A copy set up by hand still tells you about new versions, but its button opens the download page instead of updating.
 
@@ -74,7 +74,7 @@ Pick a page at the bottom left:
   - **Numbers:** show the percent used or the percent left; the % sign on the widget; reset times as the time, a countdown, or both; and the pace tick.
   - **Colors:** switch the warning colors off, or choose when a bar turns amber (50–95% used) and red (55–100%).
   - **Restore defaults**, under the sections, puts every setting back as it came (click twice to confirm). Start with Windows stays as it is.
-- **Info:** updates (check now, or switch off the daily check), credits, license, and the fine print.
+- **Info:** updates (check now, or switch off the daily check), what's new in this version, credits, license, and the fine print.
 
 To quit, right-click the tray icon (or the widget) and choose **Exit**.
 
@@ -123,7 +123,8 @@ You need the .NET 10 SDK.
 
 - `build.cmd` produces `dist\dusage.exe`, a single file with .NET built in.
 - `dotnet run --project src/Dusage` runs it while you work on it. Exit a running widget first, since only one copy runs at a time.
-- Pushing a tag such as `v1.2.0` runs [the release workflow](.github/workflows/release.yml). It builds `dusage.zip` and publishes a GitHub release, which the install command picks up.
+- Note each change under `## Unreleased` in [CHANGELOG.md](CHANGELOG.md) as you make it, written for the people using the widget. Before tagging, rename that heading to the version (`## 1.2.0 - <date>`).
+- Pushing a tag such as `v1.2.0` runs [the release workflow](.github/workflows/release.yml). It takes the version's entry from CHANGELOG.md (and stops if there isn't one), builds `dusage.zip` and publishes a GitHub release with that entry as its notes, which the install command picks up. The same entry is built into the app as What's new.
 
 The app is a small WPF project in `src/Dusage`:
 
@@ -131,7 +132,7 @@ The app is a small WPF project in `src/Dusage`:
 - `MainWindow` is the widget.
 - `ExpandedWindow` is the expanded widget: every limit in full, plus Settings and Info.
 - `TrayIcon.cs` is the icon in the notification area.
-- `Updater.cs` checks for and installs new releases; `Palette.cs` holds every color; `Sky.cs` draws the starry backdrop behind the expanded widget.
+- `Updater.cs` checks for and installs new releases; `Changelog.cs` reads CHANGELOG.md, built into the exe, for What's new under Info; `Palette.cs` holds every color; `Sky.cs` draws the starry backdrop behind the expanded widget.
 
 ## License
 

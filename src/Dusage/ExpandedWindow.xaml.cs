@@ -12,8 +12,8 @@ namespace Dusage;
 
 /// <summary>
 /// The widget, expanded: every limit with a full-width bar and its reset time, then Settings (what to show and how
-/// the widget behaves) and Info (updates, credits, the fine print) a click away. It takes the widget's place while
-/// open and hands it back when collapsed, and keeps one size whichever page or settings section is open.
+/// the widget behaves) and Info (updates, what's new, credits, the fine print) a click away. It takes the widget's
+/// place while open and hands it back when collapsed, and keeps one size whichever page or settings section is open.
 /// Every setting applies and saves immediately.
 /// </summary>
 public partial class ExpandedWindow : Window
@@ -27,7 +27,8 @@ public partial class ExpandedWindow : Window
     Settings Settings => _widget.Settings;
     Updater Updater => _widget.Updater;
 
-    public ExpandedWindow(MainWindow widget)
+    /// <param name="onInfo">Open on Info, as the first start after an update does to show what's new.</param>
+    public ExpandedWindow(MainWindow widget, bool onInfo = false)
     {
         InitializeComponent();
         _widget = widget;
@@ -46,8 +47,9 @@ public partial class ExpandedWindow : Window
         BuildServices();
         BuildOptions();
         ShowUpdate();
+        ShowNews();
         // With nothing to show yet, the first stop is choosing services.
-        (_widget.Providers.Any(_widget.Wanted) ? UsageTab : SettingsTab).IsChecked = true;
+        (onInfo ? InfoTab : _widget.Providers.Any(_widget.Wanted) ? UsageTab : SettingsTab).IsChecked = true;
     }
 
     protected override void OnSourceInitialized(EventArgs e)
@@ -434,6 +436,66 @@ public partial class ExpandedWindow : Window
         AddRow(Updates, null, $"dUsage/dt {AppInfo.Version}", status, Updater.Problem is null ? Resource("DimBrush") : WarnBrush, action);
         AddRow(Updates, null, "Check automatically", "Once a day, on GitHub", Resource("DimBrush"),
             Switch("Check for updates automatically", Settings.CheckForUpdates, on => Settings.CheckForUpdates = on));
+    }
+
+    /// <summary>
+    /// Info's What's new, from CHANGELOG.md: this version's changes, or on the first start after an update every
+    /// release's since the version that ran before, newest first. Hidden when the changelog has nothing to say.
+    /// </summary>
+    void ShowNews()
+    {
+        var releases = Changelog.Since(_widget.UpdatedFrom);
+        NewsSection.Visibility = releases.Count == 0 ? Visibility.Collapsed : Visibility.Visible;
+        if (releases.Count == 0) return;
+
+        NewsTitle.Text = releases.Count == 1
+            ? $"What's new in {releases[0].Version}"
+            : $"What's new since {AppInfo.ParseVersion(_widget.UpdatedFrom)}";
+        News.Children.Clear();
+        foreach (var release in releases)
+        {
+            if (releases.Count > 1)
+                News.Children.Add(new TextBlock
+                {
+                    Text = $"Version {release.Version}",
+                    FontFamily = (FontFamily)FindResource("Serif"),
+                    FontStyle = FontStyles.Italic,
+                    FontSize = 13.5,
+                    Margin = new Thickness(0, News.Children.Count == 0 ? 0 : 16, 0, 0),
+                });
+            foreach (var group in release.Groups)
+            {
+                if (group.Kind.Length > 0)
+                    News.Children.Add(new TextBlock
+                    {
+                        Text = group.Kind,
+                        FontSize = 11,
+                        FontWeight = FontWeights.SemiBold,
+                        // What's gone is what someone would miss, so it stands out.
+                        Foreground = group.Kind.Equals("Removed", StringComparison.OrdinalIgnoreCase) ? WarnBrush : Resource("AccentBrush"),
+                        Margin = new Thickness(0, News.Children.Count == 0 ? 0 : 10, 0, 1),
+                    });
+                foreach (var item in group.Items) News.Children.Add(Change(item));
+            }
+        }
+    }
+
+    /// <summary>One change, as a bulleted line that wraps under itself; **bold** in the changelog shows bold.</summary>
+    Grid Change(string text)
+    {
+        var grid = new Grid { Margin = new Thickness(0, 4, 0, 0) };
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(12) });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        grid.Children.Add(new TextBlock { Text = "•", Foreground = Resource("DimBrush") });
+
+        var line = new TextBlock { TextWrapping = TextWrapping.Wrap };
+        var parts = text.Split("**");
+        for (var i = 0; i < parts.Length; i++)
+            if (parts[i].Length > 0)
+                line.Inlines.Add(new Run(parts[i]) { FontWeight = i % 2 == 1 ? FontWeights.SemiBold : FontWeights.Normal });
+        Grid.SetColumn(line, 1);
+        grid.Children.Add(line);
+        return grid;
     }
 
     void OnPageChecked(object sender, RoutedEventArgs e)

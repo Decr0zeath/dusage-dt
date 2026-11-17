@@ -39,6 +39,8 @@
   <ItemGroup>
     <!-- Also the tray icon and the expanded widget's Alt+Tab icon, every size in one file. -->
     <Resource Include="Assets\dusage.ico" />
+    <!-- What's new under Info, from the same file the release workflow publishes as the notes. -->
+    <EmbeddedResource Include="..\..\CHANGELOG.md" LogicalName="CHANGELOG.md" Link="CHANGELOG.md" />
   </ItemGroup>
 
   <ItemGroup>

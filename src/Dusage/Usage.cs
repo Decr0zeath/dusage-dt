@@ -15,6 +15,10 @@ static class AppInfo
     public static readonly string Version =
         typeof(AppInfo).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion.Split('+')[0] ?? "0.0.0";
 
+    /// <summary>"v1.2.0" → 1.2.0; anything after a '-' or '+' (a pre-release or build tag) is ignored.</summary>
+    public static Version? ParseVersion(string? text) =>
+        System.Version.TryParse(text?.TrimStart('v', 'V').Split('-', '+')[0], out var version) ? version : null;
+
     /// <summary>Opens a web page in the default browser.</summary>
     public static void Open(string url) => Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
 }
