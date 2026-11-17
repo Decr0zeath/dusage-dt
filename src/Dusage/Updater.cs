@@ -46,8 +46,8 @@ sealed class Updater
         {
             using var request = new HttpRequestMessage(HttpMethod.Get, LatestUrl);
             using var release = await Net.GetJsonAsync(request, ct);
-            var latest = ParseVersion(release.RootElement.Str("tag_name")) ?? throw new UsageException("GitHub listed a release without a version.");
-            Available = latest > ParseVersion(AppInfo.Version)
+            var latest = AppInfo.ParseVersion(release.RootElement.Str("tag_name")) ?? throw new UsageException("GitHub listed a release without a version.");
+            Available = latest > AppInfo.ParseVersion(AppInfo.Version)
                 ? new Release(latest, release.RootElement.Str("html_url") ?? AppInfo.RepoUrl + "/releases/latest")
                 : null;
             Problem = null;
@@ -104,8 +104,4 @@ sealed class Updater
         Installing = false; // still here, so the update didn't happen
         Changed?.Invoke();
     }
-
-    /// <summary>"v1.2.0" → 1.2.0; anything after a '-' or '+' (a pre-release or build tag) is ignored.</summary>
-    static Version? ParseVersion(string? text) =>
-        Version.TryParse(text?.TrimStart('v', 'V').Split('-', '+')[0], out var version) ? version : null;
 }

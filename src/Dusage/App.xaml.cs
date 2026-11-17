@@ -41,6 +41,8 @@ public partial class App : Application
         };
 
         var settings = Settings.Load();
+        var previous = settings.LastVersion;
+        settings.LastVersion = AppInfo.Version;
         var widget = new MainWindow(settings);
         MainWindow = widget;
         widget.Start();
@@ -51,6 +53,12 @@ public partial class App : Application
             // First run: the expanded view doubles as the welcome screen.
             settings.Save();
             widget.Expand();
+        }
+        else if (previous != AppInfo.Version)
+        {
+            // The first start after an update says what's new. Gone back to an older version, there's nothing to say.
+            settings.Save();
+            if (Changelog.Since(previous).Count > 0) widget.ShowWhatsNew(previous);
         }
     }
 }

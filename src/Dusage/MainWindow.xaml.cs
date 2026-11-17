@@ -29,7 +29,7 @@ public partial class MainWindow : Window
     ExpandedWindow? _expanded;
     TrayIcon? _tray;
     IntPtr _hwnd;
-    bool _placed, _expandWhenPlaced, _started;
+    bool _placed, _expandWhenPlaced, _started, _openOnInfo;
     /// <summary>The corner that stays still as the widget grows or shrinks; see <see cref="OnSizeChanged"/>.</summary>
     (bool Right, bool Bottom) _corner = (true, true);
     bool _gitHubSignedIn = GitHubSignIn.Token is not null;
@@ -60,6 +60,10 @@ public partial class MainWindow : Window
     internal (bool Right, bool Bottom) Corner => _corner;
     internal Settings Settings => _settings;
     internal Updater Updater => _updater;
+
+    /// <summary>The version that ran before this one, when this run is the first after an update: Info's What's new
+    /// covers every release since. Otherwise null, and it covers this version only.</summary>
+    internal string? UpdatedFrom { get; private set; }
 
     /// <summary>Placed in the tray: the widget stays hidden and the services sit in the taskbar, beside the tray icons.</summary>
     bool InTray => _settings.Placement == WidgetPlacement.Tray;
@@ -190,7 +194,7 @@ public partial class MainWindow : Window
     /// Start with Windows lives in the registry, not in settings, and stays as it is.</summary>
     internal void RestoreDefaults()
     {
-        _settings = new Settings();
+        _settings = new Settings { LastVersion = _settings.LastVersion }; // or the next start would say what's new again
         ApplySettings();
         PlaceInCorner();
     }
@@ -214,6 +218,15 @@ public partial class MainWindow : Window
     /// Also what launching dusage again does, which recovers a widget you've lost track of.</summary>
     public void Expand() => ExpandFrom(null);
 
+    /// <summary>The first start after an update: the expanded view opens on Info, which says what's new since
+    /// <paramref name="from"/> (the version that ran before; null if that isn't known).</summary>
+    public void ShowWhatsNew(string? from)
+    {
+        UpdatedFrom = from;
+        _openOnInfo = true;
+        Expand();
+    }
+
     /// <summary>In the tray, the expanded view opens by the service clicked there, else by all of them.</summary>
     void ExpandFrom(Native.PixelRect? spot)
     {
@@ -227,7 +240,8 @@ public partial class MainWindow : Window
             _expandWhenPlaced = true; // it opens over the widget, so the widget has to be in place first
             return;
         }
-        _expanded = new ExpandedWindow(this);
+        _expanded = new ExpandedWindow(this, onInfo: _openOnInfo);
+        _openOnInfo = false; // only the once; after that it opens as usual
         _expanded.Closed += OnCollapsed;
         if (InTray) _expanded.ShowNear(spot ?? _trayStrip?.Bounds ?? Native.WorkAreaCorner());
         else _expanded.ShowOver(this);
