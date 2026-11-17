@@ -12,6 +12,8 @@ How to write an entry:
 
 ## Unreleased
 
+## 1.4.2 - 2026-11-17
+
 ### Added
 - **What's new:** the first time dUsage/dt starts after an update, the expanded widget opens on Info to show what was added, changed, fixed or removed since your last version. It stays under Info until the next update.
 
